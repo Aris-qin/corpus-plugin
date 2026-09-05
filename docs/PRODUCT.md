@@ -48,9 +48,10 @@ corpus 最初**基于 RAGFlow 的灵感**构建,目标是个人化的轻量版,�
 ## 3. 核心能力支柱（4 个）
 
 ### 支柱 A: 文献读取解析（Ingest）
-- **目标**: 任意文献格式 → 结构化 Markdown,保留原始结构
-- **现状**: `process-pdf`（Docling PDF→MD，heading-aware）/ `register-raw`（注册 raw+元数据）/ `jats_to_md`（JATS XML→MD）✅ 已实现
-- **格式范围**（L 已拍板 2026-09-05）: **PDF + DOCX + HTML** + JATS XML + 自写 MD。不设限「只 PDF」，内容来源多样化（补充材料/网页/稿件都可能）。corpus-query 现有 `process-pdf` 命令只处理 .pdf，**需扩展为多格式入口**（Docling 本身支持，属阶段 4 改造项）
+- **目标**: 任意文献格式 → **canonical 结构表示**（结构化中间层），保留原始结构
+- **现状**: `process-pdf`（Docling PDF→MD，heading-aware，仅 .pdf）/ `register-raw`（注册 raw+元数据）/ `jats_to_md`（JATS XML→MD）✅ 已实现
+- **格式范围**（L 已拍板 2026-09-05）: **PDF + DOCX + HTML** + JATS XML + 自写 MD。不设限「只 PDF」，内容来源多样化（补充材料/网页/稿件都可能）。
+- **⚠️ Canonical schema（Codex 审查 P0，阶段 3 前置）**: 多格式不能直接拼 Markdown 喂 chunker（DOCX 样式名≠语义 heading、HTML 有导航/广告/隐藏节点）。需定义 canonical schema（节点类型 / heading level/path / 正文 / table / formula / caption / source locator / parser warnings），chunker 只依赖该 schema。入口建议改名 `process-document --format auto|pdf|docx|html|jats|md`（保留 process-pdf 兼容别名）
 
 ### 支柱 B: 结构级切片存储（Chunk + Index）
 - **目标**: 切片时**尽可能保留语义完整 + 保留其结构**
@@ -58,7 +59,8 @@ corpus 最初**基于 RAGFlow 的灵感**构建,目标是个人化的轻量版,�
   - 结构: `level` / `path` / `parent_id` / `child_ids` / `sibling_ids` / `heading_chain` / `heading_path`
   - 语义: `text` / `snippet` / `snippet_source` / `section_importance`
   - 向量: `chunk_vectors`（vec0 虚拟表,1024 维 Qwen）
-- **关键约束**（L 提出的设计原则）: 切片粒度必须让**语义单元完整**,不能把一段话/一个论点切碎;结构信息必须完整保留,供召回时定位
+- **关键约束**（L 提出的设计原则）: 切片粒度必须让**语义单元完整**，不能把一段话/一个论点切碎;结构信息必须完整保留，供召回时定位
+- **⚠️ Generation 化（Codex 审查 P0，阶段 3 前置）**: chunk ID 应含「document content hash + 规范化路径 + chunker 版本」；re-chunk 时先建新 generation，完成 embedding/index 后**原子切换 active_generation**，再异步清理旧代。重处理不得静默覆盖旧版本
 
 ### 支柱 C: 位置感知内容召回（Retrieve）
 - **目标**: 召回时不仅返回内容本身,还能:
@@ -80,9 +82,8 @@ corpus 最初**基于 RAGFlow 的灵感**构建,目标是个人化的轻量版,�
   - `conclusion_data_consistency`（结论-数据一致性）
   - 公式: `evidence_mean = mean(3 特征)`;`quality_final = max(quality_type_prior_score, evidence_mean)`
   - type_prior 来自 article_type（meta_analysis→high / rct→high / cohort→medium...）
-- **⚠️ 旧评分是否适合:未知**（L 提出,开放问题 Q1）:
-  - 现在的 `max(prior, evidence)` 让「类型先验」可能盖过 curator 实际判断（一篇烂 meta-analysis 仍会被 prior 抬到 high）
-  - 需要验证: 三个特征维度是否真的代表「文献可信度」?公式是否要重设计?
+- **⚠️ 公式版本化（Codex 审查 P0，阶段 3 前置）**: 权重不得硬编码——保存 `formula_version` / `prior_weight` / `evidence_weight` / `rubric_version` / `scorer_id` / `scored_at`，新公式上线可重算与审计。评审后代码实现与文档拍板不一致 = P0 风险，阶段 4 落地时一并迁移。
+- **⚠️ 冷启动可见性（Codex 审查 P0）**: 无打分 fallback 时返回 `quality_status=prior_only`，不得伪装成已审核；`evidence_n` < 3 时降低置信度，默认不允许进 primary（除非显式人工 override）
 
 ---
 
@@ -116,21 +117,45 @@ corpus 最初**基于 RAGFlow 的灵感**构建,目标是个人化的轻量版,�
 
 | 能力 | 现状 | 缺口 | 优先级 |
 |---|---|---|---|
-| A 解析 | Docling PDF / JATS / MD | 格式边界待定（是否要 DOCX/HTML） | P2 |
-| B 切片 | tree-aware,结构字段全 | **语义完整性无验证**（没有 chunk 质量评估机制） | P1 |
-| C 召回 | 5 个工具,位置 + 树上下文可用 | 主 query 召回默认不带位置/前后文;前后文「进一步分析」没自动化（要 agent 自己再调 get_chunk） | P1 |
-| D 评分 | 3 特征 + max 公式 | **公式合理性未验证**;评分可信度如何注入召回排序 | P1 |
+| A 解析 | Docling PDF / JATS / MD | **多格式 canonical schema 未定义**（PDF/DOCX/HTML 需统一中间表示） | P0 |
+| B 切片 | tree-aware,结构字段全 | **Generation/re-chunk 原子切换未设计**;chunk ID 需含 content hash + chunker 版本 | P0 |
+| C 召回 | 5 个工具,位置 + 树上下文可用 | 主 query 默认不带位置/前后文（L 已拍板保持轻量，按需 get_chunk）✅ | P1 |
+| D 评分 | 3 特征 + max 公式（旧） | **公式已拍板 0.7/0.3 但代码未改**;需 formula_version + prior_only 冷启动标记 | P0 |
+| E 可观测性（新增） | 无 | **ingestion_jobs 状态机缺失**（discovered→parsed→chunked→embedded→indexed→failed）;错误/重试/版本不可见 | P0 |
+| F 一致性（新增） | 无 | **fsck 缺失**（chunks↔vec0 orphan 校验）;备份/恢复演练未定义 | P1 |
+| G 纠错闭环（新增） | 无 | 无 UI 但有 CLI 即可: 标记坏 chunk / 重跑单文档 / 导出抽样报告 | P1 |
+
+---
+
+## 5.1 横切能力（Codex 审查 2026-09-05 采纳）
+
+1. **可观测性**: `ingestion_jobs` manifest（状态 / 错误 / 重试次数 / 输入 hash / parser/chunker/embedder 版本）——出错时 agent 能看到半成品而不是瞎猜
+2. **一致性**: 开启 foreign_keys；`fsck` 检测向量孤儿/重复/维度错误；embedding 失败只能留下可重试 job，不得留下「已索引」状态
+3. **纠错闭环**: CLI 提供查看/标记坏 chunk、重跑单文档、导出抽样报告
+4. **引用工作流边界**: researcher 通过 PubMed elink 得到的引用关系存为外部工作流产物（含抓取时间/来源），**不得混入** corpus 的相关度或 quality，避免排序语义漂移
+5. **数据一致性**: documents.article_type/prior 修改 → 标记 quality_evidence stale 按 formula_version 重算；relevance 随 chunk generation 标 stale 不得复用
+6. **备份/恢复**: 在线一致性快照、schema 版本、vec0 重建步骤、恢复演练（P0）
 
 ---
 
 ## 6. Non-Goals（明确不做）
 
 1. **fact-infra 联动**: corpus 只做文献库,fact 只做项目管理,两边不互相依赖
-2. **通用文档库**: 不追求 Word/Excel/PPT/扫描件全格式,聚焦文献（PDF 为主）
+2. **文献相关格式专用**: 不追求通用文档库（扫描 OCR / PPT / Excel 不属于文献内容），边界 = 文献相关格式（PDF/DOCX/HTML/JATS/MD，已拍板）
 3. **知识图谱 / 实体关系抽取**: 不做 RAGFlow 的 Graph/Wiki/Timeline 类知识编译
 4. **Web UI / 可视化**: agent + CLI 是唯一界面
 5. **多租户 / 权限 / 多用户**: 个人单用户库
 6. **分布式向量库 / Elasticsearch**: SQLite + sqlite-vec 单机足够
+
+---
+
+## 6.1 Codex 审查结论（2026-09-05，全文见 docs/review/codex-review-2026-09-05.md）
+
+**判定: 条件通过（可进阶段 3）**，前置条件（已采纳进本文档）：
+1. 评分公式设计↔实现一致性 → formula_version + 迁移/回算（§3 支柱 D）
+2. 多格式 canonical schema + 输入 hash + generation/re-chunk 原子切换（§3 支柱 A/B）
+3. Python worker/IPC 契约 + spawn 降级路径 + 并发/超时语义（阶段 3 ARCHITECTURE.md 定）
+4. 量化验收门槛（阶段 5）：Recall@10≥0.85 / MRR@10≥0.70 / 标题树准确率≥95% / fsck 0 orphan / 评分 Spearman ρ≥0.70，详见审查报告验收矩阵
 
 ---
 
@@ -141,6 +166,14 @@ corpus 最初**基于 RAGFlow 的灵感**构建,目标是个人化的轻量版,�
 - **Q3 — 格式边界** ✅ L 已拍板 2026-09-05: 支持 **PDF + DOCX + HTML** + JATS + MD，内容来源不限于 PDF。
 - **Q0 — 引用层要不要结构化?**（2026-09-05 已确认方向:引用追踪走 researcher 工作流,暂不做系统级）。触发再做信号: 文献库数百篇 / 需要被引次数做排序特征 / 需要一键跳引用网络。
 - **Q4 — 切片语义完整性验证方法** ✅ L 已拍板 2026-09-05: 「自动单测守底线 + 按格式类型低频人工抽查」。chunker 是确定性规则算法（无 LLM 调用），一次验收某格式 = 该类所有文献复用；日常入库不抽查、不阻塞。详见 §5 Gap 分析 B 行。
+
+---
+
+**判定: 条件通过（可进阶段 3）**，前置条件（已采纳进本文档）：
+1. 评分公式设计↔实现一致性 → formula_version + 迁移/回算（§3 支柱 D）
+2. 多格式 canonical schema + 输入 hash + generation/re-chunk 原子切换（§3 支柱 A/B）
+3. Python worker/IPC 契约 + spawn 降级路径 + 并发/超时语义（阶段 3 ARCHITECTURE.md 定）
+4. 量化验收门槛（阶段 5）：Recall@10≥0.85 / MRR@10≥0.70 / 标题树准确率≥95% / fsck 0 orphan / 评分 Spearman ρ≥0.70，详见审查报告验收矩阵
 
 ---
 
