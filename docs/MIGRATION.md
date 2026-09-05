@@ -24,13 +24,23 @@
 
 ## 2. 迁移动作清单（按顺序执行）
 
-### Phase 0 — 备份（必须先做）
+> **顺序原则（codex 审查修订）**: 备份/体检 → 环境 → 配置 → 数据迁移 → 评分 → worker。任何破坏性动作前先完成一致性快照与 integrity 校验。
+
+### Phase 0 — 一致快照 + 体检（必须先做）
 ```bash
-# 生产库备份（229MB）
-cp /home/node/.openclaw/workspace/projects/_corpus/corpus.db \
-   /home/node/.openclaw/workspace/projects/_corpus/corpus.db.bak-$(date +%Y%m%d)
-# raw 目录只读校验（确认原文件在）
-ls /home/node/.openclaw/workspace/projects/_corpus/raw/ | wc -l
+# 1. 一致性备份（不用 cp!SQLite 在线 cp 可能不一致）→ 用 backup API / VACUUM INTO
+python3 - <<'EOF'
+import sqlite3
+src = sqlite3.connect('/home/node/.openclaw/workspace/projects/_corpus/corpus.db')
+dst = sqlite3.connect('/home/node/.openclaw/workspace/projects/_corpus/corpus.db.bak-$(date +%Y%m%d)')
+src.backup(dst)
+dst.close(); src.close()
+EOF
+# 2. 恢复演练: 该备份能独立打开 + integrity_check OK
+python3 -c "import sqlite3; c=sqlite3.connect('...bak'); print(c.execute('PRAGMA integrity_check').fetchone())"
+# 3. 迁移前体检: schema 版本 / 磁盘 ≥2× 库大小 / WAL checkpoint / vec0 载入
+sqlite3 corpus.db "PRAGMA user_version; PRAGMA journal_mode; SELECT count(*) FROM chunks; SELECT count(*) FROM chunk_vectors;"
+# 4. 记录基线: 行数 / schema / vec 维度 → 迁移后对比
 ```
 
 ### Phase 1 — 环境恢复（Python 侧,一次）
@@ -43,27 +53,26 @@ python3 -c "import sqlite_vec; print(sqlite_vec.get_loadable_path())"
 
 ### Phase 2 — 配置层落地（M1）
 - [ ] `corpus.toml` 创建于 `~/.openclaw/corpus/corpus.toml`（或 `$CORPUS_HOME`）
-- [ ] `[paths] corpus_db` 指向生产库绝对路径
-- [ ] `[paths] vec_ext = "auto"`
+- [ ] `[paths] corpus_db` 指向生产库绝对路径;`[paths] vec_ext = "auto"`;`[paths] retention_days = 7`
 - [ ] 6 处硬编码消除验证: `grep -rn "/root/.openclaw\|scripts/corpus" corpus/ plugins/corpus-query/src/` → 0 命中
 
 ### Phase 3 — 数据层迁移（M2/M4）
-- [ ] `init` 或启动自检: 旧 corpus.db v2 schema 自动迁移到 v3（ALTER 幂等）
-- [ ] 验证: `sqlite3 corpus.db ".schema documents"` 含 `content_hash/generation`
-- [ ] `fsck` 跑一次: chunks↔vec0 一致、无孤儿 → **迁移前基线**
-- [ ] embedding 维度校验: 现有向量是否 1024（qwen v4）→ 与 config.embedding.dim 一致
-- [ ] 若不一致: 跑 `reembed_project.py` 全量重嵌（期间旧代可读）
+- [ ] **先 fsck 基线**（迁移前）: chunks↔vec0 一致、无孤儿 → 结果存 `docs/review/fsck-baseline-<date>.txt`（失败**不迁移,先修**）
+- [ ] 运行 v2→v3 幂等迁移（`PRAGMA table_info` 逐列检查 + user_version 版本链,§6.3）
+- [ ] 验证: `sqlite3 corpus.db ".schema documents"` 含 `content_hash/generation`;quality_evidence_v3 行数 = 旧表行数
+- [ ] 迁移后 fsck: 与基线一致（0 orphan）+ integrity_check OK
+- [ ] embedding 维度校验: 现有向量是否 1024（qwen v4）→ 与 config.embedding.dim 一致;不一致 → `rebuild-vectors`（新代,旧代保留回滚窗）
 
 ### Phase 4 — 评分公式切换（M5）
-- [ ] `corpus recompute-scores --formula v2` 全量回算
-- [ ] 抽样验证: 取 3 篇已评分文献, 手工核对 `0.7×evidence+0.3×prior` 数值
-- [ ] 确认 `quality_status ∈ {evidence, prior_only, partial}` 写正确
+- [ ] `corpus recompute-scores --formula v2` 全量回算（append-only,旧 v1 行保留）
+- [ ] 抽样验证: 取 3 篇已评分文献, 手工核对 `0.7×evidence+0.3×prior` 数值 + quality_status 枚举正确
+- [ ] 确认 prior_only / partial / override 推荐行为（默认不进 primary）生效
 
 ### Phase 5 — 在线召回切换（M3）
-- [ ] `corpus worker --socket /tmp/corpus-worker.sock` 拉起
-- [ ] `health` 自检: vec0 加载 + 维度 OK
+- [ ] `corpus worker --socket <config worker_socket>` 拉起（pidfile + flock 单实例验证）
+- [ ] `health` 自检: vec0 加载 + 维度 + schema 版本 OK
 - [ ] TS 插件 5 工具逐一调用验证（走 worker）
-- [ ] 降级验证: 杀掉 worker → 工具自动 fallback spawn → 恢复 worker → 回切
+- [ ] 降级验证（**含失败注入**）: 杀 worker → 工具自动 fallback spawn → 重启 worker → 回切;中途断开连接/重复 score/超时 → 幂等表查询验证（score-status）
 - [ ] 24h 观察期后, 移除 spawn 硬编码（保留 feature flag）
 
 ### Phase 6 — 兼容期收尾
@@ -73,15 +82,20 @@ python3 -c "import sqlite_vec; print(sqlite_vec.get_loadable_path())"
 
 ---
 
-## 3. 回滚方案
+## 3. 回滚方案（按阶段,真回滚,非"指回旧路径"）
+
+> 原则: **停止写入 → 恢复一致快照 → 校验 → 恢复服务**。新 schema 已写入数据库时,"config 指回旧路径"无法回滚已格式化的库——必须恢复 Phase 0 快照。
 
 | 阶段 | 回滚动作 |
 |---|---|
-| Phase 0-4 | 恢复 corpus.db.bak-<date>（数据）; config 指回旧路径 |
-| Phase 5 | 停 worker; 插件 `CORPUS_QUERY_MODE=spawn` 强制降级（代码保留旧路径）|
-| 全部 | git revert（仓库内代码） + 恢复生产库备份 |
+| Phase 0-1 | 无数据变更,直接重做 |
+| Phase 2 | config 改回旧值即可 |
+| Phase 3 | 停止写入 → 恢复 Phase 0 一致快照（backup API 产物）→ 重跑 fsck 验证 → 恢复服务（新代码仍可读旧 schema,兼容） |
+| Phase 4 | 恢复快照（丢弃 v2 评分行;v1 行仍在快照里）或跑 `recompute-scores --formula v1`（不推荐,快照更干净） |
+| Phase 5 | 停 worker → `CORPUS_QUERY_MODE=spawn` 强制降级（代码保留旧路径）→ 验证 spawn 通路正常 |
+| 全部 | 仓库代码 git revert;生产库恢复快照;raw/canon 目录不受影响（canon 可再生,raw 只读） |
 
-> 回滚原则: 数据先行、配置次之、代码最后。任何阶段回滚不应破坏现有 corpus 使用（生产在跑）。
+> 备份保留期: 快照保留 ≥30 天 / ≥2 份轮换（回滚窗口 7 天旧代数据 + 30 天快照双保险）。每次回滚演练留记录。
 
 ---
 
@@ -89,22 +103,27 @@ python3 -c "import sqlite_vec; print(sqlite_vec.get_loadable_path())"
 
 | 风险 | 影响 | 缓解 |
 |---|---|---|
-| corpus.db 229MB 迁移中损坏 | 生产不可用 | Phase 0 备份必做; 迁移只 ALTER 加列不重建表 |
-| 现有向量维度 ≠ 1024 | 召回失效 | Phase 3 维度校验先行; 需要时 reembed |
-| vec0.so auto 探测失败 | worker 起不来 | `vec_ext` 支持显式路径兜底（架构 §4.3）|
-| 双后端合并后 chunk_query 行为漂移 | get/similar 回归 | 阶段 4 M6 补 get/similar 单测, 对比迁移前后输出 |
-| skill 仍指向旧命令 | agent 调用出错 | Phase 6 同步更新 SKILL; 别名兼容期 |
+| corpus.db 229MB 迁移中损坏 | 生产不可用 | Phase 0 一致快照必须（backup API,非 cp）+ integrity 基线;迁移只加列不重建表 |
+| 现有向量维度 ≠ 1024 | 召回失效 | Phase 3 维度校验先行;需要时 rebuild-vectors（新代,旧代回滚窗）|
+| vec0.so auto 探测失败 | worker 起不来 | `vec_ext` 显式路径兜底（架构 §4.3）|
+| 双后端合并后 chunk_query 行为漂移 | get/similar 回归 | 阶段 4 M6 补 get/similar 单测 + 迁移前后输出对比 |
+| skill 仍指向旧命令 | agent 调用出错 | Phase 6 同步更新 SKILL;别名兼容期 |
+| ALTER 非幂等（SQLite 无 IF NOT EXISTS） | 重复迁移报错 | §6.3 迁移契约: PRAGMA table_info 逐列检查 + user_version 版本链 |
+| vec0 虚拟表无法 ALTER(加 generation 列) | 迁移失败 | generation 走 chunk_id 前缀,不 ALTER vec0（架构 §6.1）|
+| 备份 cp 在线不一致 | 回滚库损坏 | Phase 0 强制 backup API / VACUUM INTO,恢复演练验证 |
+| 评分 v1/v2 行混淆 | 显示错误评分 | quality_evidence_v3 append-only + current 指针 + fsck 指针唯一性校验 |
 
 ---
 
-## 5. 验收（迁移成功定义）
+## 5. 验收（迁移成功定义,含失败注入）
 
 1. `grep -rn "scripts/corpus" corpus/ plugins/` = 0（TS 侧）/ 仅注释
-2. worker health 通过 + 5 工具全绿
-3. fsck 0 orphan（与 Phase 3 基线一致）
-4. 评分 v2 数值抽查通过
-5. 降级/回滚演练各跑通一次
+2. worker health 通过 + 5 工具全绿（含 score JSON 响应,无正则）
+3. fsck 0 orphan（与 Phase 3 基线一致）;integrity_check OK
+4. 评分 v2 数值抽查通过（3 篇手工核对）;quality_status 枚举正确
+5. 降级/回滚演练各跑通一次（含失败注入: 杀 worker 中途断开 / 重复 score 幂等 / socket stale 清理 / 磁盘满模拟）
 6. 生产 corpus 使用（PRISMA 流水线）无感知切换
+7. 迁移幂等验证: 迁移脚本重跑一次 = 无变化（0 新增列/行）
 
 ---
 
