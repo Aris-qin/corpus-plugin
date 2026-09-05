@@ -1,0 +1,68 @@
+# ============================================================
+# corpus-plugin .gitignore
+# 覆盖 Python / TypeScript / Node.js / 编辑器 / OS
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+venv/
+env/
+.env
+.env.local
+
+# Python 包构建
+build/
+dist/
+*.whl
+
+# 特定:corpus 数据库与测试数据
+corpus/*.db
+corpus/*.db-journal
+corpus/*.db-wal
+corpus/*.db-shm
+corpus/nanorobot_demo/
+corpus/.data/
+corpus/scratch/
+
+# --- Node.js / TypeScript ---
+node_modules/
+.pnpm-store/
+.npm
+.eslintcache
+*.tsbuildinfo
+
+# TypeScript 构建产物
+plugins/*/dist/
+plugins/*/build/
+plugins/*/coverage/
+plugins/*/.tsbuild/
+
+# --- 编辑器 / OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*~
+
+# --- 项目特定 ---
+*.log
+*.bak
+*.tmp
+.cache/
+.worktrees/

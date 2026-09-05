@@ -1,0 +1,38 @@
+{
+  "name": "openclaw-plugin-fact-infra",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "plugin:build": "npm run build && openclaw plugins build --entry ./dist/src/index.js",
+    "plugin:validate": "npm run build && openclaw plugins validate --entry ./dist/src/index.js",
+    "test": "npm run build && node --test dist/test/*.test.js"
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "openclaw": ">=2026.5.17"
+  },
+  "dependencies": {
+    "typebox": "^1.1.38"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "openclaw": ">=2026.5.17",
+    "typescript": "^5.9.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/src/index.js"
+    ]
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  }
+}

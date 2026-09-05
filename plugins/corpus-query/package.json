@@ -1,0 +1,23 @@
+{
+  "name": "corpus-query-tool",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "typebox": "1.1.39"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.24-beta.2"
+  },
+  "openclaw": {
+    "extensions": ["./dist/index.js"],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noCheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

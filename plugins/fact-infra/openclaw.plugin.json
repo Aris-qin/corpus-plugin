@@ -1,0 +1,37 @@
+{
+  "id": "fact-infra",
+  "name": "Fact Infrastructure",
+  "description": "科研项目管理的事实真相源（Fact Layer）。19 个 fact_* 工具：项目初始化、状态查询、任务/决策/问题/实验记录、目标管理、期刊画像。",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "fact_init",
+      "fact_status",
+      "fact_query",
+      "fact_index",
+      "fact_rebind",
+      "fact_archive",
+      "fact_goal_add",
+      "fact_goal_update",
+      "fact_phase_set",
+      "fact_note_add",
+      "fact_task_add",
+      "fact_task_update",
+      "fact_decision_add",
+      "fact_decision_resolve",
+      "fact_issue_open",
+      "fact_issue_resolve",
+      "fact_exp_log",
+      "fact_journal_query",
+      "fact_journal_upsert"
+    ]
+  }
+}

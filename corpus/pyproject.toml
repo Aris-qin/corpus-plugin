@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "corpus-pipeline"
+version = "0.1.0"
+description = "Unified corpus SQLite + sqlite-vec pipeline for research literature management"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "阿呆", email = "adai@openclaw.local" }
+]
+dependencies = [
+  "sqlite-vec>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "mypy>=1.7",
+  "ruff>=0.1.0",
+]
+embedding = [
+  # qwen embedding called via urllib (no extra dep), but here's where you'd add
+  # openai or anthropic if switching providers
+]
+
+[project.scripts]
+corpus-cli = "cli:main"
+
+[tool.setuptools]
+py-modules = [
+  "cli",
+  "db",
+  "chunker_markdown",
+  "jats_to_md",
+  "openalex",
+  "reembed_project",
+  "migrate_v2",
+]
+
+[tool.setuptools.package-data]
+corpus = ["*.sql", "*.sh"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
