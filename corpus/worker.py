@@ -1,5 +1,5 @@
 from __future__ import annotations
-import errno,os,socket,fcntl
+import errno,os,socket,fcntl,json,hashlib
 from enum import Enum
 from pathlib import Path
 class WorkerState(str,Enum):
@@ -29,3 +29,30 @@ class Worker:
   except OSError: self.socket_path.unlink(); return True
  @staticmethod
  def backoff_delays(attempts=3): return [2**i for i in range(min(attempts,3))]
+
+ def handle(self, request, *, query_handler=None, score_handler=None):
+  if request.get('schema_version') != 1 or not request.get('request_id'):
+   return {'schema_version':1,'request_id':request.get('request_id',''),'ok':False,'error':{'code':'invalid_request'}}
+  try:
+   command=request.get('command'); params=request.get('params') or request
+   if command == 'health': result={'state':self.state.value}
+   elif command == 'query': result=query_handler(params) if query_handler else (_ for _ in ()).throw(RuntimeError('query handler unavailable'))
+   elif command == 'score': result=score_handler(params) if score_handler else (_ for _ in ()).throw(RuntimeError('score handler unavailable'))
+   else: raise ValueError(f'unknown command: {command}')
+   return {'schema_version':1,'request_id':request['request_id'],'ok':True,'result':result}
+  except Exception as exc:
+   return {'schema_version':1,'request_id':request.get('request_id',''),'ok':False,'error':{'code':'handler_error','message':str(exc)}}
+
+ def serve_once(self, conn, *, query_handler=None, score_handler=None):
+  from .ipc import FrameReader, encode_frame
+  reader=FrameReader()
+  while True:
+   data=conn.recv(65536)
+   if not data: break
+   for req in reader.feed(data): conn.sendall(encode_frame(self.handle(req, query_handler=query_handler, score_handler=score_handler)))
+
+ def start(self):
+  self.clear_stale_socket(); self.acquire(); self.transition(WorkerState.STARTING)
+  self.socket_path.parent.mkdir(parents=True,exist_ok=True)
+  sock=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); sock.bind(str(self.socket_path)); os.chmod(self.socket_path,0o600); sock.listen(16)
+  self.transition(WorkerState.READY); return sock
