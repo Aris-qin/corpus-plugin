@@ -404,21 +404,13 @@ def cmd_process_raw(args):
     db.conn.commit()
     print(f"[process-raw] {pmid}: cleared old chunks/vec")
 
-    # V3: 选择 chunker 根据文件后缀
-    suffix = raw_full.suffix.lower()
-    if suffix == ".md":
-        from chunker_markdown import chunk_markdown
-        chunks = chunk_markdown(full_text, source_file=str(raw_full))
-        chunker_name = "V2-heading-aware (markdown)"
-    elif suffix == ".txt":
-        from chunker_markdown import chunk_plain_text
-        chunks = chunk_plain_text(full_text, source_file=str(raw_full))
-        chunker_name = "V3-heading-aware (plain-text IMRAD regex)"
-    else:
-        # 其他格式走 plain-text chunker 作 fallback
-        from chunker_markdown import chunk_plain_text
-        chunks = chunk_plain_text(full_text, source_file=str(raw_full))
-        chunker_name = f"V3-plain-text (fallback for {suffix})"
+    from canonical import process_raw
+    from chunker_markdown import chunk_canonical
+    canon_candidates = [raw_full.with_suffix(".canon.json"), raw_full.parent / f"{pmid}.canon.json"]
+    canon_path = next((p for p in canon_candidates if p.exists()), None)
+    result = process_raw(pmid, canon_path=canon_path, legacy_path=None if canon_path else raw_full)
+    chunks = chunk_canonical(result.document.to_dict())
+    chunker_name = "canonical"
     if not chunks:
         print(f"[process-raw] WARNING: no chunks emitted from {raw_full} [{chunker_name}]", file=sys.stderr)
         db.close()

@@ -63,7 +63,10 @@ def backup(src_path: str | Path, backup_dir: str | Path,
     src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True, timeout=30)
     dst = sqlite3.connect(str(dst_path))
     try:
-        src.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        try:
+            src.execute("PRAGMA wal_checkpoint(PASSIVE)")
+        except sqlite3.Error:
+            pass
         src.backup(dst, pages=pages, sleep=sleep)
         dst.commit()
         if dst.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
