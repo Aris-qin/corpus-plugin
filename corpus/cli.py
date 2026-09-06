@@ -43,7 +43,8 @@ from chunker_markdown import chunk_markdown_file, write_jsonl as _write_chunk_js
 
 WORKSPACE_ROOT = Path(os.environ.get("WORKSPACE_ROOT", "/root/.openclaw/workspace"))
 EMBEDDING_DIM_DEFAULT = 1024  # Qwen text-embedding-v4 default dim (aligned with corpus DB)\nEMBEDDING_MODE_DEFAULT = "qwen"  # use real v4 API by default (was "mock")
-UNIFIED_CORPUS_DB = WORKSPACE_ROOT / "projects" / "_corpus" / "corpus.db"
+from config import config as _cfg
+UNIFIED_CORPUS_DB = Path(_cfg["paths"]["corpus_db"])
 
 
 # ---------- 子命令 ----------
@@ -1622,7 +1623,7 @@ def main():
     parser = argparse.ArgumentParser(description="corpus CLI")
     parser.add_argument("--dim", type=int, default=EMBEDDING_DIM_DEFAULT,
                         help="embedding dimension (default 1536)")
-    parser.add_argument("--embedding-mode", choices=["qwen", "openai"], default="qwen",
+    parser.add_argument("--embedding-mode", choices=["qwen", "openai", "mock"], default="qwen",
                         help="embedding backend (default mock)")
 
     sub = parser.add_subparsers(dest="cmd", required=True)

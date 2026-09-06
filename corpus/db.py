@@ -114,14 +114,31 @@ CREATE TABLE IF NOT EXISTS relevance (
 );
 
 CREATE TABLE IF NOT EXISTS quality_evidence (
-    pmid TEXT PRIMARY KEY REFERENCES documents(pmid) ON DELETE CASCADE,
+    pmid TEXT NOT NULL,
+    project_slug TEXT NOT NULL,
     criterion_validity REAL,          -- 0-1
     outcome_reliability REAL,
     conclusion_data_consistency REAL,
     evidence_mean REAL,               -- mean of 3 features
     quality_final REAL,               -- max(quality_type_prior_score, evidence_mean)
     computed_at TEXT,
-    notes TEXT                        -- curator 自由备注
+    notes TEXT,                       -- curator 自由备注
+    PRIMARY KEY (pmid, project_slug),
+    FOREIGN KEY (pmid) REFERENCES documents(pmid) ON DELETE CASCADE
+);
+
+-- project registry + document grouping (used by cli.py; production DB has
+-- these tables created by hand — folded back into schema so new DBs bootstrap
+-- from zero instead of depending on manual DDL)
+CREATE TABLE IF NOT EXISTS projects (
+    slug TEXT PRIMARY KEY, title TEXT, status TEXT,
+    description TEXT, created_at TEXT, updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS document_groups (
+    pmid TEXT NOT NULL, project_slug TEXT NOT NULL,
+    role TEXT DEFAULT 'core', added_at TEXT, notes TEXT,
+    PRIMARY KEY (pmid, project_slug)
 );
 """
 
