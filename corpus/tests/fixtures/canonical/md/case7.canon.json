@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0",
+  "doc_id": "duplicate_headings",
+  "content_hash": "sha256:e22c657fa3e6e9d10d4d3216b197b25ea7a37c5f8a6d68f91e3ed4a9dffb9336",
+  "source_file": "fixtures/md/duplicate_headings.input",
+  "parser": "legacy_md",
+  "parser_version": "1.0",
+  "nodes": [
+    {
+      "node_id": "nd_b5d4f25acc9a",
+      "kind": "heading",
+      "level": 1,
+      "sec_num": null,
+      "title": "Results",
+      "text": "Results",
+      "ordinal": 1,
+      "parent_id": null,
+      "path": "/1",
+      "locator": null,
+      "attrs": {}
+    },
+    {
+      "node_id": "nd_53a058ee5059",
+      "kind": "paragraph",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "Overall survival improved in the treatment arm.",
+      "ordinal": 2,
+      "parent_id": "nd_b5d4f25acc9a",
+      "path": "/1/1",
+      "locator": null,
+      "attrs": {
+        "markdown": "Overall survival improved in the treatment arm."
+      }
+    },
+    {
+      "node_id": "nd_061ff22bb06c",
+      "kind": "heading",
+      "level": 2,
+      "sec_num": null,
+      "title": "Results",
+      "text": "Results",
+      "ordinal": 3,
+      "parent_id": "nd_b5d4f25acc9a",
+      "path": "/1/2",
+      "locator": null,
+      "attrs": {}
+    },
+    {
+      "node_id": "nd_a948dd31252b",
+      "kind": "paragraph",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "Duplicate section titles must remain distinguishable by path.",
+      "ordinal": 4,
+      "parent_id": "nd_061ff22bb06c",
+      "path": "/1/2/1",
+      "locator": null,
+      "attrs": {
+        "markdown": "Duplicate section titles must remain distinguishable by path."
+      }
+    },
+    {
+      "node_id": "nd_0cc3a93224b0",
+      "kind": "heading",
+      "level": 3,
+      "sec_num": null,
+      "title": "Deeply Nested",
+      "text": "Deeply Nested",
+      "ordinal": 5,
+      "parent_id": "nd_061ff22bb06c",
+      "path": "/1/2/2",
+      "locator": null,
+      "attrs": {}
+    },
+    {
+      "node_id": "nd_1b821c56a1cd",
+      "kind": "paragraph",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "A gap from H2 to H3 is legal here and needs no compression.",
+      "ordinal": 6,
+      "parent_id": "nd_0cc3a93224b0",
+      "path": "/1/2/2/1",
+      "locator": null,
+      "attrs": {
+        "markdown": "A gap from H2 to H3 is legal here and needs no compression."
+      }
+    }
+  ],
+  "parser_warnings": []
+}
