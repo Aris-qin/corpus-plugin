@@ -18,6 +18,13 @@ import struct
 import sys
 from pathlib import Path
 
+# 自举: 本文件位于 plugins/corpus-query/,corpus/ 在 repo 根的上一级目录。
+# 裸脚本运行(插件 spawn 桥接)时无包上下文,必须显式加 path。
+_here = Path(__file__).resolve().parent
+for _maybe in (_here.parent.parent, _here.parent.parent.parent):
+    if (_maybe / "corpus" / "db.py").exists() and str(_maybe) not in sys.path:
+        sys.path.insert(0, str(_maybe))
+
 from corpus.config import config
 CORPUS_DB = Path(config["paths"]["corpus_db"])
 VEC_EXT = config["paths"].get("vec_ext", "")
@@ -29,8 +36,11 @@ def serialize_float32(vector: list[float]) -> bytes:
 
 def open_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(CORPUS_DB))
+    # vec0 via python binding (native load_extension of raw vec0.so is ABI-incompatible
+    # with the stdlib sqlite3 module: 'undefined symbol: sqlite3__init').
+    import sqlite_vec
     conn.enable_load_extension(True)
-    conn.load_extension(VEC_EXT)
+    sqlite_vec.load(conn)
     conn.enable_load_extension(False)
     return conn
 

@@ -9,10 +9,9 @@
     "openclaw": ">=2026.3.24-beta.2"
   },
   "openclaw": {
-    "extensions": ["./dist/index.js"],
-    "compat": {
-      "pluginApi": ">=2026.3.24-beta.2"
-    }
+    "extensions": [
+      "./dist/index.js"
+    ]
   },
   "scripts": {
     "build": "tsc --noCheck"

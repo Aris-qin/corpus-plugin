@@ -1,7 +1,16 @@
 {
   "id": "corpus-query-tool",
   "name": "Corpus Query Tool",
-  "description": "Hybrid search, self-written document retrieval, and three-dimensional literature scoring over the unified corpus",
+  "description": "Expose the corpus CLI as agent-callable search and scoring tools.",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "version": "0.1.0",
   "contracts": {
     "tools": [
       "corpus_query",
@@ -10,13 +19,5 @@
       "corpus_get_chunk",
       "corpus_list_similar_level"
     ]
-  },
-  "activation": {
-    "onStartup": true
-  },
-  "configSchema": {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {}
   }
 }

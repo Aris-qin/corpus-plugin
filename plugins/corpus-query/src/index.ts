@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import { Type } from "typebox";
 
 const CLI_PATH = process.env.CLI_PATH ?? process.env.CORPUS_CLI_PATH ?? "corpus/cli.py";
@@ -155,31 +155,31 @@ const similarLevelParameters = Type.Object({
   ),
 });
 
-export default definePluginEntry({
+export default defineToolPlugin({
   id: "corpus-query-tool",
   name: "Corpus Query Tool",
   description: "Expose the corpus CLI as agent-callable search and scoring tools.",
-  register(api) {
-    api.registerTool({
+  tools: (tool) => [
+    tool({
       name: "corpus_query",
       description:
         "Hybrid vector and keyword search over the unified literature corpus. Returns relevance, quality, venue, and primary/supporting/background recommendations. Use to check known literature for a project or retrieve evidence-graded papers.",
       parameters: queryParameters,
-      async execute(_id, params) {
+      async execute(params, _config, _ctx) {
         const args = ["query", "--project", params.project, "--query", params.query];
         if (params.top_k !== undefined) args.push("--top", String(params.top_k));
         if (params.pmid_filter) args.push("--pmid-filter", params.pmid_filter);
         if (params.rerank_mode) args.push("--rerank-mode", params.rerank_mode);
         return runWorker("query", params, () => runJsonCli(args));
       },
-    });
+    }),
 
-    api.registerTool({
+    tool({
       name: "corpus_search_self",
       description:
         "Search self-written documents with Qwen embeddings and heading-aware tree rerank. Returns chunk path, heading chain, parent, and level metadata. Use level to filter headings or expand_context to include parent and siblings.",
       parameters: searchSelfParameters,
-      async execute(_id, params) {
+      async execute(params, _config, _ctx) {
         const args = [
           "--embedding-mode",
           "qwen",
@@ -194,14 +194,14 @@ export default definePluginEntry({
         if (params.expand_context) args.push("--expand-context");
         return runWorker("search", params, () => runJsonCli(args));
       },
-    });
+    }),
 
-    api.registerTool({
+    tool({
       name: "corpus_score",
       description:
         "Recalculate a paper's quality evidence scores from criterion validity, outcome reliability, and conclusion-data consistency. The CLI persists the score and computes quality_final for curator workflows.",
       parameters: scoreParameters,
-      async execute(_id, params) {
+      async execute(params, _config, _ctx) {
         const args = [
           "score",
           "--project",
@@ -218,26 +218,26 @@ export default definePluginEntry({
         if (params.notes) args.push("--notes", params.notes);
         return runWorker("score", {...params, score_event_id: scoreEventId()}, () => runJsonCli([...args, "--json", "--score-event-id", scoreEventId()]));
       },
-    });
+    }),
 
-    api.registerTool({
+    tool({
       name: "corpus_get_chunk",
       description:
         "Get a single chunk's full content plus complete heading-tree context (path, heading chain, parent, children, siblings). Use this to understand WHERE a chunk sits in its document's structure before retrieving similar-level content.",
       parameters: getChunkParameters,
-      async execute(_id, params) {
+      async execute(params, _config, _ctx) {
         const include = params.include ?? ["text", "metadata"];
         const args = ["get", "--chunk-id", params.chunk_id, "--include", include.join(",")];
         return runWorker("get", params, () => runChunkHelperJson(args));
       },
-    });
+    }),
 
-    api.registerTool({
+    tool({
       name: "corpus_list_similar_level",
       description:
         "Given a chunk, find chunks at the SAME heading level with similar content (vector similarity + heading-chain overlap). Use to retrieve cross-document parallel sections (e.g. all 'Methods' sections across papers, all 'Limitations' sections in a review).",
       parameters: similarLevelParameters,
-      async execute(_id, params) {
+      async execute(params, _config, _ctx) {
         const args = [
           "similar",
           "--chunk-id",
@@ -248,6 +248,6 @@ export default definePluginEntry({
         if (params.same_doc) args.push("--same-doc");
         return runWorker("similar", params, () => runChunkHelperJson(args));
       },
-    });
-  },
+    }),
+  ],
 });

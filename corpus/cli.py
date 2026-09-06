@@ -42,7 +42,8 @@ from chunker_markdown import chunk_markdown_file, write_jsonl as _write_chunk_js
 
 
 WORKSPACE_ROOT = Path(os.environ.get("WORKSPACE_ROOT", "/root/.openclaw/workspace"))
-EMBEDDING_DIM_DEFAULT = 1024  # Qwen text-embedding-v4 default dim (aligned with corpus DB)\nEMBEDDING_MODE_DEFAULT = "qwen"  # use real v4 API by default (was "mock")
+EMBEDDING_DIM_DEFAULT = 1024  # Qwen text-embedding-v4 default dim (aligned with corpus DB)
+EMBEDDING_MODE_DEFAULT = "qwen"  # use real v4 API by default (was "mock")
 from config import config as _cfg
 UNIFIED_CORPUS_DB = Path(_cfg["paths"]["corpus_db"])
 
@@ -1261,6 +1262,39 @@ def cmd_score(args):
         )
         db.conn.commit()
     notes_with_proj = (args.notes or "") + f" | project={project}"
+    if args.score_event_id:
+        # worker protocol path: append-only quality v3 + deterministic current pointer
+        row = db.insert_quality_v3(
+            pmid=pmid,
+            project=project,
+            formula_version="v3",
+            rubric_version="curator-cli",
+            quality_final=max(
+                QUALITY_TO_NUMERIC.get(
+                    db.get_document(pmid).get("quality_type_prior", "unknown"), 0.40)
+                if db.get_document(pmid) else 0.40,
+                (args.criterion + args.outcome + args.conclusion) / 3,
+            ),
+            quality_status="scored",
+            source="cli",
+            source_event_id=args.score_event_id,
+            criterion_validity=args.criterion,
+            outcome_reliability=args.outcome,
+            conclusion_data_consistency=args.conclusion,
+            prior_score=None,
+            canonical_input_json=None,
+            override_reason=None,
+            override_by=None,
+        )
+        db.close()
+        if args.json:
+            print(json.dumps({"ok": True, "inserted": row["inserted"],
+                              "pmid": pmid, "project": project,
+                              "quality_final": row.get("quality_final"),
+                              "evidence_mean": row.get("evidence_mean")}))
+        else:
+            print(f"[score] {pmid} (project={project}): quality_final={row.get('quality_final')}, evidence_mean={row.get('evidence_mean')}")
+        return
     db.upsert_quality_evidence(
         pmid=pmid,
         project_slug=project,  # 2026-07-22: schema 升级加项目隔离
@@ -1716,6 +1750,10 @@ def main():
     p_s.add_argument("--conclusion", type=float, required=True,
                      help="conclusion_data_consistency 0-1")
     p_s.add_argument("--notes", default="")
+    p_s.add_argument("--score-event-id", default=None,
+                     help="idempotency source event id (worker protocol; writes quality v3)")
+    p_s.add_argument("--json", action="store_true",
+                     help="emit machine-readable JSON result")
 
     p_g = sub.add_parser("group", help="add document to project group (or change role)")
     p_g.add_argument("--project", required=True, help="project slug")
