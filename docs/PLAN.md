@@ -1,7 +1,7 @@
 # corpus-plugin 项目计划
 
 > **5 阶段流程**:GIT → 产品设计 → 技术方案 → 代码书写 → 项目验证
-> 当前阶段:**GIT (v0.1.0) ✅ 完成**
+> 当前阶段:**项目验证(阶段 5)✅ 完成(清单 1-5)/ v1.0.0 tag 待 L 确认**
 
 ## 项目目标
 
@@ -79,12 +79,12 @@
 **目标**:确保重构后整体可用、文档完整、可发布。
 
 **清单**:
-- [ ] Python 流水线 E2E 测试(至少 1 个真实 PRISMA 流程跑通)
-- [ ] Plugin `corpus-query` 19/19 + 5/5 工具调用验证
-- [ ] Plugin `fact-infra` 19/19 工具调用验证
-- [ ] 文档校对:`README` / `docs/` / 各子目录 `README.md`
-- [ ] 部署脚本:`install.sh` 或 Dockerfile
-- [ ] 版本发布:`v1.0.0` tag + release notes
+- [x] Python 流水线 E2E 测试(至少 1 个真实 PRISMA 流程跑通)
+- [x] Plugin `corpus-query` 19/19 + 5/5 工具调用验证
+- [x] Plugin `fact-infra` 19/19 工具调用验证
+- [x] 文档校对:`README` / `docs/` / 各子目录 `README.md`
+- [x] 部署脚本:`install.sh` 或 Dockerfile
+- [ ] 版本发布:`v1.0.0` tag + release notes(待 L 确认后打 tag)
 
 ## 风险与依赖
 

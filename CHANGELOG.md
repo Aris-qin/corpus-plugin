@@ -4,6 +4,23 @@ All notable changes to corpus-plugin are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [1.0.0] - 2026-09-06
+
+### Added
+- 阶段 5 验证产物:Python 流水线 E2E(`corpus/tests/e2e.sh`,临时库全链路)、插件工具冒烟测试(`plugins/corpus-query/test/smoke.mjs` 5/5、`plugins/fact-infra/test/smoke.mjs` 19/19)、worker socket 链路测试 6 个
+- 部署脚本 `install.sh`(build+validate+copy,`--check`/`--dry-run`,离线依赖复用)
+- 文档:`docs/review/stage5-verification-2026-09-06.md` 验收报告;两个插件 `src/README.md`
+
+### Changed
+- corpus-query 插件迁移到 `defineToolPlugin` API(OpenClaw 2026.9.1 契约),manifest 重建
+- `cli.py`:`UNIFIED_CORPUS_DB` 改由 `config.paths.corpus_db` 解析(消除硬编码);score 新增 `--score-event-id`/`--json`(写 quality_evidence_v3,对齐 worker 协议);`--embedding-mode` 增加显式 `mock`;修复模块级 `\n` 字面转义
+- `config.py`:修复 `sqlite_vec.get_loadable_path()` → `loadable_path()`(vec 自动探测此前从未生效)
+- `chunk_query.py`:vec0 改由 `sqlite_vec.load()` python 绑定加载(原生 load_extension ABI 不兼容);sys.path 自举支持裸脚本运行
+- `db.py`:schema 对齐生产库(补 `projects`/`document_groups` 表,`quality_evidence` 复合主键)
+
+### Fixed
+- 阶段 5 验证发现并修复 8 个真实缺陷(见 `docs/review/stage5-verification-2026-09-06.md` §2)
+
 ## [0.1.0] - 2026-09-05
 
 ### Added
