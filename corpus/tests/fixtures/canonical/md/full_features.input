@@ -1,0 +1,29 @@
+# 1 Introduction
+
+EGFR degradation is a key mechanism in targeted oncology therapy. This paragraph
+establishes the background and motivation for the study described below.
+
+## 1.1 Motivation
+
+The unmet need is substantial across solid tumours.
+
+# 2 Methods
+
+We enrolled patients across three centres and applied the following criteria.
+
+- Adults aged 18 or older
+- Confirmed EGFR mutation
+- No prior targeted therapy
+
+| Arm | N | HR |
+|-----|---|-----|
+| Treatment | 120 | 0.62 |
+| Control | 118 | 1.00 |
+
+Table 1. Baseline characteristics and hazard ratios by arm.
+
+The primary endpoint is expressed as $$\frac{\lambda_t}{\lambda_0}$$ over time.
+
+![Kaplan-Meier survival curve](fig1.png)
+
+[^note1]: Hazard ratios were computed with a Cox proportional-hazards model.

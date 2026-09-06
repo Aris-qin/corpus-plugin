@@ -648,6 +648,74 @@ def _build_chain(nodes: list[HeadingNode], cur: HeadingNode, target_level: int) 
     return list(dict.fromkeys(chain))  # dedupe preserving order
 
 
+# ============ Canonical entry point (IMPLEMENTATION.md §1) ============
+# The chunker's single canonical input. `doc` is a canonical document dict (see
+# corpus/canonical.py). Heading nodes define the tree; every non-heading node
+# becomes one MarkdownChunk carrying its ancestor heading chain, so downstream
+# heading_match / tree-aware retrieval work identically to the markdown path.
+
+def chunk_canonical(doc: dict) -> list[MarkdownChunk]:
+    """Convert a canonical document dict into MarkdownChunks.
+
+    One chunk per non-heading node; heading nodes contribute their title to the
+    heading_chain / heading_path of their descendants. Oversize node text is
+    split with the same MAX_CHUNK_CHARS packing used for markdown.
+    """
+    nodes = doc.get("nodes", [])
+    by_id = {n["node_id"]: n for n in nodes}
+    doc_id = doc.get("doc_id", "doc")
+    source_file = doc.get("source_file", "")
+
+    def _chain(node: dict) -> list[str]:
+        chain: list[str] = []
+        cur = node
+        # walk up parent links, collecting heading titles
+        seen = set()
+        while cur is not None and cur["node_id"] not in seen:
+            seen.add(cur["node_id"])
+            if cur["kind"] == "heading" and cur is not node:
+                chain.append(cur["title"])
+            pid = cur.get("parent_id")
+            cur = by_id.get(pid) if pid else None
+        return list(reversed(chain))
+
+    out: list[MarkdownChunk] = []
+    for node in nodes:
+        if node["kind"] == "heading":
+            continue
+        text = node.get("text", "")
+        if not text.strip():
+            continue
+        chain = _chain(node)
+        heading_path = " > ".join(chain)
+        level = len(chain)
+        base_path = node.get("path", "")
+        pieces = [text] if len(text) <= MAX_CHUNK_CHARS else [
+            "\n".join(grp) for grp in _split_oversize_body(text.split("\n"), MAX_CHUNK_CHARS)
+        ]
+        for idx, piece in enumerate(pieces, start=1):
+            piece = piece.strip()
+            if not piece:
+                continue
+            chunk_id = f"{doc_id}__{node['node_id']}__p{idx}"
+            out.append(MarkdownChunk(
+                chunk_id=chunk_id,
+                doc_id=doc_id,
+                level=level,
+                path=base_path,
+                parent_id=node.get("parent_id"),
+                child_ids=[],
+                sibling_ids=[],
+                heading_chain=chain,
+                section_number="",
+                section_title="",
+                text=piece,
+                char_count=len(piece),
+                source_file=source_file,
+            ))
+    return out
+
+
 def write_jsonl(chunks: list[MarkdownChunk], out_path: str | Path) -> int:
     """Write chunks as JSONL (one chunk per line). Returns count."""
     p = Path(out_path)

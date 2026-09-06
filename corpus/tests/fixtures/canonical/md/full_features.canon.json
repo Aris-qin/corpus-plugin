@@ -1,0 +1,193 @@
+{
+  "schema_version": "1.0",
+  "doc_id": "full_features",
+  "content_hash": "sha256:29668f003fb888527b1f29fd8e392612c21bdcaee4e0f4ee7b4f6741fa7827d3",
+  "source_file": "fixtures/md/full_features.input",
+  "parser": "legacy_md",
+  "parser_version": "1.0",
+  "nodes": [
+    {
+      "node_id": "nd_af25c5cabc87",
+      "kind": "heading",
+      "level": 1,
+      "sec_num": "1",
+      "title": "Introduction",
+      "text": "Introduction",
+      "ordinal": 1,
+      "parent_id": null,
+      "path": "/1",
+      "locator": null,
+      "attrs": {}
+    },
+    {
+      "node_id": "nd_d51b6760f159",
+      "kind": "paragraph",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "EGFR degradation is a key mechanism in targeted oncology therapy. This paragraph establishes the background and motivation for the study described below.",
+      "ordinal": 2,
+      "parent_id": "nd_af25c5cabc87",
+      "path": "/1/1",
+      "locator": null,
+      "attrs": {
+        "markdown": "EGFR degradation is a key mechanism in targeted oncology therapy. This paragraph\nestablishes the background and motivation for the study described below."
+      }
+    },
+    {
+      "node_id": "nd_0e1a82d7f914",
+      "kind": "heading",
+      "level": 2,
+      "sec_num": "1.1",
+      "title": "Motivation",
+      "text": "Motivation",
+      "ordinal": 3,
+      "parent_id": "nd_af25c5cabc87",
+      "path": "/1/2",
+      "locator": null,
+      "attrs": {}
+    },
+    {
+      "node_id": "nd_bfdc2cdfdaf1",
+      "kind": "paragraph",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "The unmet need is substantial across solid tumours.",
+      "ordinal": 4,
+      "parent_id": "nd_0e1a82d7f914",
+      "path": "/1/2/1",
+      "locator": null,
+      "attrs": {
+        "markdown": "The unmet need is substantial across solid tumours."
+      }
+    },
+    {
+      "node_id": "nd_861394a21483",
+      "kind": "heading",
+      "level": 1,
+      "sec_num": "2",
+      "title": "Methods",
+      "text": "Methods",
+      "ordinal": 5,
+      "parent_id": null,
+      "path": "/2",
+      "locator": null,
+      "attrs": {}
+    },
+    {
+      "node_id": "nd_8f94a1c84bc9",
+      "kind": "paragraph",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "We enrolled patients across three centres and applied the following criteria.",
+      "ordinal": 6,
+      "parent_id": "nd_861394a21483",
+      "path": "/2/1",
+      "locator": null,
+      "attrs": {
+        "markdown": "We enrolled patients across three centres and applied the following criteria."
+      }
+    },
+    {
+      "node_id": "nd_ce7c0ba7e837",
+      "kind": "list",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "- Adults aged 18 or older\n- Confirmed EGFR mutation\n- No prior targeted therapy",
+      "ordinal": 7,
+      "parent_id": "nd_861394a21483",
+      "path": "/2/2",
+      "locator": null,
+      "attrs": {
+        "items": [
+          "Adults aged 18 or older",
+          "Confirmed EGFR mutation",
+          "No prior targeted therapy"
+        ],
+        "markdown": "- Adults aged 18 or older\n- Confirmed EGFR mutation\n- No prior targeted therapy"
+      }
+    },
+    {
+      "node_id": "nd_ec4a89023c85",
+      "kind": "table",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "| Arm | N | HR |\n|-----|---|-----|\n| Treatment | 120 | 0.62 |\n| Control | 118 | 1.00 |",
+      "ordinal": 8,
+      "parent_id": "nd_861394a21483",
+      "path": "/2/3",
+      "locator": null,
+      "attrs": {
+        "markdown": "| Arm | N | HR |\n|-----|---|-----|\n| Treatment | 120 | 0.62 |\n| Control | 118 | 1.00 |"
+      }
+    },
+    {
+      "node_id": "nd_88832b52c536",
+      "kind": "caption",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "Table 1. Baseline characteristics and hazard ratios by arm.",
+      "ordinal": 9,
+      "parent_id": "nd_861394a21483",
+      "path": "/2/4",
+      "locator": null,
+      "attrs": {
+        "label": "Table 1.",
+        "ref": "Table 1."
+      }
+    },
+    {
+      "node_id": "nd_47eeee08ed1d",
+      "kind": "paragraph",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "The primary endpoint is expressed as $$\\frac{\\lambda_t}{\\lambda_0}$$ over time.",
+      "ordinal": 10,
+      "parent_id": "nd_861394a21483",
+      "path": "/2/5",
+      "locator": null,
+      "attrs": {
+        "markdown": "The primary endpoint is expressed as $$\\frac{\\lambda_t}{\\lambda_0}$$ over time."
+      }
+    },
+    {
+      "node_id": "nd_40639cfabae7",
+      "kind": "figure",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "Kaplan-Meier survival curve",
+      "ordinal": 11,
+      "parent_id": "nd_861394a21483",
+      "path": "/2/6",
+      "locator": null,
+      "attrs": {
+        "alt": "Kaplan-Meier survival curve",
+        "uri": "fig1.png"
+      }
+    },
+    {
+      "node_id": "nd_9cb894224077",
+      "kind": "footnote",
+      "level": 0,
+      "sec_num": null,
+      "title": "",
+      "text": "Hazard ratios were computed with a Cox proportional-hazards model.",
+      "ordinal": 12,
+      "parent_id": "nd_861394a21483",
+      "path": "/2/7",
+      "locator": null,
+      "attrs": {
+        "ref": "note1",
+        "markdown": "[^note1]: Hazard ratios were computed with a Cox proportional-hazards model."
+      }
+    }
+  ],
+  "parser_warnings": []
+}
