@@ -2,7 +2,11 @@
 
 - 验收日期:2026-09-06
 - 阶段 4 发布判定:BLOCKED → 本阶段验证后 **RELEASE CANDIDATE**
-- 验证范围:Python 流水线 E2E + 两个插件构建/工具调用 + 文档 + 部署脚本
+- 验证范围:Python 流水线 E2E + corpus-query 插件构建/工具调用 + 文档 + 部署脚本
+
+> 范围说明:本次项目重构对象是 **corpus Python 流水线 + corpus-query 插件**。
+> fact-infra 是 2026-09-02 已独立构建完成的既有成果(TS 1.0.0,18 测试全过),
+> 本报告不将其计入验证范围(PLAN.md 阶段 5 相应清单一并标注)。
 
 ---
 
@@ -12,9 +16,9 @@
 |---|---|---|---|
 | 1 | Python 流水线 E2E(真实 PRISMA 流程) | ✅ | `corpus/tests/e2e.sh` — init→register-raw→process-raw→query→score→group→list 全链路,临时库(不碰生产 229MB DB),mock embedding,vec0 9 条向量 |
 | 2 | Plugin corpus-query 5/5 工具调用 | ✅ | `plugins/corpus-query/test/smoke.mjs` — 5 工具真实 execute(spawn 通道),临时 DB,全部返回有效结果 |
-| 3 | Plugin fact-infra 19/19 工具调用 | ✅ | `plugins/fact-infra/test/smoke.mjs` — 19 工具注册 + execute 可调;8 工具真实调用链(init→status→note→task→decision→issue→goal→query)全绿；`node --test` 18/18 |
-| 4 | 文档校对 | ✅ | README/docs/ 各子目录 README 齐全(补了 2 个 src/README) |
-| 5 | 部署脚本 | ✅ | `install.sh` — build+validate+copy,`--check`/`--dry-run`,离线依赖复用;实测双插件安装成功 |
+| 3 | Plugin fact-infra 19/19 | ⬜ | **既有成果,不在本次范围**(2026-09-02 已构建:TS 1.0.0 + `node --test` 18/18 全过,见 `plugins/fact-infra/PORT_REPORT.md`) |
+| 4 | 文档校对 | ✅ | README/docs/ + corpus-query src/README |
+| 5 | 部署脚本 | ✅ | `install.sh` — build+validate+copy(corpus-query),`--check`/`--dry-run`,离线依赖复用;实测安装成功 |
 | 6 | 版本发布 v1.0.0 tag | ⏳ | 见 CHANGELOG;tag 由 L 确认后打(发布动作) |
 
 ## 2. 验证中发现的真实缺陷(8 个,全部已修)
@@ -40,7 +44,8 @@
 - **qwen 真实 embedding / 真实 rerank API**:未实测(需 API key + 网络;E2E 用 mock)。生产首次调用验证是发布后验收项。
 - **229MB 生产 DB**:未触碰(红线)。迁移演练留给 MIGRATION.md 阶段。
 - **gateway 重启 / 插件热加载**:未做(红线)。install.sh 输出明确提示。
+- **fact-infra**:本次未改动其源码/构建,与验证无关。
 
 ## 4. 结论
 
-阶段 4/5 代码与验证就绪:**v1.0.0 发布候选**。打 tag 与生产上线的 gateway 操作需 L 拍板。
+阶段 4/5 代码与验证就绪(corpus 流水线 + corpus-query):**v1.0.0 发布候选**。打 tag 与生产上线的 gateway 操作需 L 拍板。

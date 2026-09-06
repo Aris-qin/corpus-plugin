@@ -80,9 +80,9 @@
 
 **清单**:
 - [x] Python 流水线 E2E 测试(至少 1 个真实 PRISMA 流程跑通)
-- [x] Plugin `corpus-query` 19/19 + 5/5 工具调用验证
-- [x] Plugin `fact-infra` 19/19 工具调用验证
-- [x] 文档校对:`README` / `docs/` / 各子目录 `README.md`
+- [x] Plugin `corpus-query` 5/5 工具调用验证
+- [ ] Plugin `fact-infra` 19/19 工具调用验证(既有成果 2026-09-02 已构建,不在本次重构范围)
+- [x] 文档校对:`README` / `docs/` / 各子目录 `README.md`(corpus-query 侧)
 - [x] 部署脚本:`install.sh` 或 Dockerfile
 - [ ] 版本发布:`v1.0.0` tag + release notes(待 L 确认后打 tag)
 

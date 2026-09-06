@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # corpus-plugin install.sh — 本地部署脚本
 #
-# 构建两个 OpenClaw TS 插件 + validate + 复制到 OpenClaw 插件目录。
+# 构建 corpus-query 插件 + validate + 复制到 OpenClaw 插件目录。
+# (fact-infra 为既有构建成果,不在本项目部署范围。)
 # 幂等、非交互、不触碰 gateway 配置(插件加载/重启由用户决定)。
 #
 # 用法:
@@ -114,7 +115,6 @@ install_one() {
 }
 
 install_one corpus-query
-install_one fact-infra
 
 log "==> done"
 if [ "$MODE" = "install" ]; then

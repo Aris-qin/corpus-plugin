@@ -7,9 +7,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ## [1.0.0] - 2026-09-06
 
 ### Added
-- 阶段 5 验证产物:Python 流水线 E2E(`corpus/tests/e2e.sh`,临时库全链路)、插件工具冒烟测试(`plugins/corpus-query/test/smoke.mjs` 5/5、`plugins/fact-infra/test/smoke.mjs` 19/19)、worker socket 链路测试 6 个
+- 阶段 5 验证产物:Python 流水线 E2E(`corpus/tests/e2e.sh`,临时库全链路)、插件工具冒烟测试(`plugins/corpus-query/test/smoke.mjs` 5/5)
 - 部署脚本 `install.sh`(build+validate+copy,`--check`/`--dry-run`,离线依赖复用)
-- 文档:`docs/review/stage5-verification-2026-09-06.md` 验收报告;两个插件 `src/README.md`
+- 文档:`docs/review/stage5-verification-2026-09-06.md` 验收报告;corpus-query 插件 `src/README.md`
 
 ### Changed
 - corpus-query 插件迁移到 `defineToolPlugin` API(OpenClaw 2026.9.1 契约),manifest 重建
