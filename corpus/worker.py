@@ -12,9 +12,9 @@ class Worker:
   self._db_path=db_path
   self._embedding_dim=embedding_dim
  def _default_query(self, params):
-  from .db import heading_match_jaccard, text_keyword_hit
+  from db import heading_match_jaccard, text_keyword_hit
   if self._db is None and self._db_path:
-   from .db import CorpusDB
+   from db import CorpusDB
    self._db=CorpusDB(self._db_path, embedding_dim=self._embedding_dim)
   if self._db is None: raise RuntimeError('default query requires db injection')
   emb=params.get('embedding') or params.get('query_embedding')
@@ -27,7 +27,7 @@ class Worker:
   return {'schema_version':1,'results':out}
  def _default_score(self, params):
   if self._db is None and self._db_path:
-   from .db import CorpusDB
+   from db import CorpusDB
    self._db=CorpusDB(self._db_path, embedding_dim=self._embedding_dim)
   if self._db is None: raise RuntimeError('default score requires db injection')
   allowed=('pmid','project','formula_version','rubric_version','quality_final','quality_status','source','source_event_id','criterion_validity','outcome_reliability','conclusion_data_consistency','prior_score','canonical_input_json','override_reason','override_by','scored_at')
@@ -69,12 +69,20 @@ class Worker:
    return {'schema_version':1,'request_id':request.get('request_id',''),'ok':False,'error':{'code':'handler_error','message':str(exc)}}
 
  def serve_once(self, conn, *, query_handler=None, score_handler=None):
-  from .ipc import FrameReader, encode_frame
+  from ipc import FrameReader, encode_frame
+  from ipc import InvalidFrame, FrameTooLarge, IPCError
   reader=FrameReader()
   while True:
    data=conn.recv(65536)
    if not data: break
-   for req in reader.feed(data): conn.sendall(encode_frame(self.handle(req, query_handler=query_handler, score_handler=score_handler)))
+   try:
+    reqs=reader.feed(data)
+   except IPCError as exc:
+    # protocol-level bad frame (bad schema_version / too large): answer an
+    # invalid_request error instead of dropping the connection silently.
+    conn.sendall(encode_frame({'schema_version':1,'request_id':'invalid','ok':False,'error':{'code':'invalid_request','message':str(exc)}}))
+    continue
+   for req in reqs: conn.sendall(encode_frame(self.handle(req, query_handler=query_handler, score_handler=score_handler)))
 
  def start(self):
   self.clear_stale_socket(); self.acquire(); self.transition(WorkerState.STARTING)
