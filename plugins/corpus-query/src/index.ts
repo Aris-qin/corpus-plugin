@@ -2,9 +2,11 @@ import { spawn } from "node:child_process";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { Type } from "typebox";
 
-const CLI_PATH = "/root/.openclaw/workspace/scripts/corpus/cli.py";
-const CHUNK_HELPER_PATH = "/root/.openclaw/workspace/scripts/corpus/plugin/chunk_query.py";
+const CLI_PATH = process.env.CLI_PATH ?? process.env.CORPUS_CLI_PATH ?? "corpus/cli.py";
+const CHUNK_HELPER_PATH = process.env.CHUNK_HELPER_PATH ?? process.env.CORPUS_CHUNK_HELPER_PATH ?? "plugins/corpus-query/chunk_query.py";
 const CLI_TIMEOUT_MS = 120_000;
+const WORKER_SOCKET = process.env.CORPUS_WORKER_SOCKET ?? "/tmp/corpus-worker.sock";
+const SPAWN_FALLBACK = process.env.CORPUS_QUERY_MODE !== "socket";
 
 type CliResult = {
   content: Array<{ type: "text"; text: string }>;
@@ -75,21 +77,25 @@ async function runChunkHelperJson(args: string[]): Promise<CliResult> {
   }
 }
 
-async function runScoreCli(args: string[]): Promise<CliResult> {
-  const output = (await execCli(args)).trim();
-  const match = output.match(
-    /^\[score\]\s+(\S+)\s+\(project=([^)]+)\):\s+quality_final=([0-9.]+),\s+evidence_mean=([0-9.]+)$/,
-  );
-  if (!match) {
-    throw new Error(`corpus score returned an unexpected response: ${output.slice(0, 500)}`);
+async function runWorker(command: string, params: unknown, fallback: () => Promise<CliResult>): Promise<CliResult> {
+  const request = { schema_version: 1, request_id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, command, params };
+  if (process.env.CORPUS_QUERY_MODE !== "spawn") {
+    try {
+      const net = await import("node:net");
+      const response = await new Promise<any>((resolve, reject) => {
+        const c = net.createConnection(WORKER_SOCKET); let buf = "";
+        c.setTimeout(CLI_TIMEOUT_MS); c.on("connect", () => c.write(JSON.stringify(request) + "\n"));
+        c.on("data", d => { buf += d.toString(); const i = buf.indexOf("\n"); if (i >= 0) { c.end(); resolve(JSON.parse(buf.slice(0,i))); } });
+        c.on("error", reject); c.on("timeout", () => reject(new Error("worker timeout")));
+      });
+      if (!response.ok) throw new Error(response.error?.message ?? "worker error");
+      return jsonResult(response.result);
+    } catch (e) { if (!SPAWN_FALLBACK) throw e; }
   }
-  return jsonResult({
-    pmid: match[1],
-    project: match[2],
-    quality_final: Number(match[3]),
-    evidence_mean: Number(match[4]),
-  });
+  return fallback();
 }
+
+function scoreEventId(): string { return `sev_${Date.now()}_${Math.random().toString(36).slice(2)}`; }
 
 const queryParameters = Type.Object({
   project: Type.String({ description: "Project slug, for example ar-review." }),
@@ -164,7 +170,7 @@ export default definePluginEntry({
         if (params.top_k !== undefined) args.push("--top", String(params.top_k));
         if (params.pmid_filter) args.push("--pmid-filter", params.pmid_filter);
         if (params.rerank_mode) args.push("--rerank-mode", params.rerank_mode);
-        return runJsonCli(args);
+        return runWorker("query", params, () => runJsonCli(args));
       },
     });
 
@@ -186,7 +192,7 @@ export default definePluginEntry({
         if (params.top_k !== undefined) args.push("--top", String(params.top_k));
         if (params.level !== undefined) args.push("--level", String(params.level));
         if (params.expand_context) args.push("--expand-context");
-        return runJsonCli(args);
+        return runWorker("search", params, () => runJsonCli(args));
       },
     });
 
@@ -210,7 +216,7 @@ export default definePluginEntry({
           String(params.conclusion_data_consistency),
         ];
         if (params.notes) args.push("--notes", params.notes);
-        return runScoreCli(args);
+        return runWorker("score", {...params, score_event_id: scoreEventId()}, () => runJsonCli([...args, "--json", "--score-event-id", scoreEventId()]));
       },
     });
 
@@ -222,7 +228,7 @@ export default definePluginEntry({
       async execute(_id, params) {
         const include = params.include ?? ["text", "metadata"];
         const args = ["get", "--chunk-id", params.chunk_id, "--include", include.join(",")];
-        return runChunkHelperJson(args);
+        return runWorker("get", params, () => runChunkHelperJson(args));
       },
     });
 
@@ -240,7 +246,7 @@ export default definePluginEntry({
           String(params.top_k ?? 5),
         ];
         if (params.same_doc) args.push("--same-doc");
-        return runChunkHelperJson(args);
+        return runWorker("similar", params, () => runChunkHelperJson(args));
       },
     });
   },
