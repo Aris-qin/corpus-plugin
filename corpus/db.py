@@ -368,7 +368,7 @@ class CorpusDB:
                       pmid_filter: Optional[str] = None,
                       generation: Optional[int] = None,
                       top_k: int = 10,
-                      include_retired: bool = False) -> list[tuple[str, float]]:
+                      _include_retired: bool = False, **kwargs) -> list[tuple[str, float]]:
         """返回 (chunk_id, distance) 列表；distance 越小越相关。
 
         §2/§3 契约：所有 KNN 强制 active generation。vec0 MATCH 在子查询里独立
@@ -381,9 +381,11 @@ class CorpusDB:
           返回 retired 代）。
         - legacy（generation IS NULL）的 chunk 永远不进 KNN（JOIN 直接排除）。
         """
+        _include_retired = bool(kwargs.pop("include_retired", _include_retired))
+        if kwargs: raise TypeError(f"unexpected keyword arguments: {kwargs}")
         top_k = max(1, int(top_k))
         params: list = [serialize_float32(query_embedding), top_k]
-        join_status = "" if include_retired else " AND g.status='active'"
+        join_status = "" if _include_retired else " AND g.status='active'"
         sql = f"""
         SELECT v.chunk_id, v.distance
         FROM (

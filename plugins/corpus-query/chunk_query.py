@@ -18,8 +18,9 @@ import struct
 import sys
 from pathlib import Path
 
-CORPUS_DB = Path("/root/.openclaw/workspace/projects/_corpus/corpus.db")
-VEC_EXT = "/usr/local/lib/node_modules/openclaw/node_modules/sqlite-vec-linux-x64/vec0.so"
+from corpus.config import config
+CORPUS_DB = Path(config["paths"]["corpus_db"])
+VEC_EXT = config["paths"].get("vec_ext", "")
 
 
 def serialize_float32(vector: list[float]) -> bytes:
