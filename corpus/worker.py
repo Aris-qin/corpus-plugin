@@ -9,8 +9,13 @@ class Worker:
  def __init__(self,pidfile,socket_path,db=None,db_path=None,embedding_dim=1024):
   self.pidfile=Path(pidfile); self.socket_path=Path(socket_path); self.state=WorkerState.STOPPED; self._lock=None
   self._db=db
+  self._db_path=db_path
+  self._embedding_dim=embedding_dim
  def _default_query(self, params):
   from .db import heading_match_jaccard, text_keyword_hit
+  if self._db is None and self._db_path:
+   from .db import CorpusDB
+   self._db=CorpusDB(self._db_path, embedding_dim=self._embedding_dim)
   if self._db is None: raise RuntimeError('default query requires db injection')
   emb=params.get('embedding') or params.get('query_embedding')
   if emb is None: raise ValueError('query requires embedding')
@@ -21,6 +26,9 @@ class Worker:
     hm,_=heading_match_jaccard(keys,row[3] or '') if keys else (False,0); hit=text_keyword_hit(row[2] or '',keys) if keys else 0; out.append({'chunk_id':row[0],'pmid':row[1],'text':row[2],'heading_path':row[3] or '','snippet':row[4],'ordinal':row[5],'level':row[6],'path':row[7],'parent_id':row[8],'generation':row[9],'heading_match':hm,'score':1/(1+float(dist))})
   return {'schema_version':1,'results':out}
  def _default_score(self, params):
+  if self._db is None and self._db_path:
+   from .db import CorpusDB
+   self._db=CorpusDB(self._db_path, embedding_dim=self._embedding_dim)
   if self._db is None: raise RuntimeError('default score requires db injection')
   allowed=('pmid','project','formula_version','rubric_version','quality_final','quality_status','source','source_event_id','criterion_validity','outcome_reliability','conclusion_data_consistency','prior_score','canonical_input_json','override_reason','override_by','scored_at')
   row=self._db.insert_quality_v3(**{k:params[k] for k in allowed if k in params}); return {'schema_version':1,'evidence':row,'inserted':row.get('inserted',False)}
