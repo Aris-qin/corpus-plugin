@@ -1,0 +1,1 @@
+"""Candidate-only corpus implementation."""

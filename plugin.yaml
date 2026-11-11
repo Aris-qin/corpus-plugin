@@ -1,0 +1,5 @@
+name: corpus-query
+version: 2.0.0
+description: Global research library with six tools; sensitive actions disabled
+author: Q
+requires_env: [CORPUS_AUTHORIZED_SANDBOX_ROOT]

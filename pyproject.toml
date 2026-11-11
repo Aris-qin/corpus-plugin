@@ -1,0 +1,17 @@
+[build-system]
+requires = []
+build-backend = "build_backend"
+backend-path = ["."]
+
+[project]
+name = "corpus-candidate"
+version = "2.0.0"
+requires-python = ">=3.11"
+description = "Global research source library for Hermes; restricted sensitive actions"
+
+[project.scripts]
+corpus = "corpus_core.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/safe"]
+addopts = "--strict-markers"

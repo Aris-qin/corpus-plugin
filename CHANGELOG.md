@@ -4,6 +4,20 @@ All notable changes to corpus-plugin are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] - 2026-11-11
+
+### Added
+- Hermes 六工具全局资料库、schema v4、原件/版本/切片追溯与调研草稿。
+- 显式预算、partial 索引安全恢复、DashScope 原生 rerank、有界工作集全局召回。
+- 源码/sdist/wheel 回归矩阵和进程中断恢复压测。
+- 专用解释器适配入口及明确目标、拒绝覆盖的安装脚本。
+
+### Safety and upgrade limitations
+- 正式发布、批量正式采用、合并、永久删除仍默认禁用，可信真人审批未接通。
+- 旧向量来源与原件托管需单独接管；禁止把保真迁移称为自动语义检索接管。
+- 显式 runner 与 operation_id 预算授权，不自动索引或全库重建。
+- 旧 OpenClaw 代码保留，原安装脚本归档至 docs/install-v1-legacy.sh。
+
 ## [1.0.0] - 2026-09-06
 
 ### Added

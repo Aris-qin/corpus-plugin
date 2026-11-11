@@ -1,0 +1,67 @@
+{
+  "user_version": 0,
+  "schema": [
+    [
+      "documents",
+      "CREATE TABLE documents (\n    pmid TEXT PRIMARY KEY,\n    title TEXT, doi TEXT, source TEXT, retrieved_at TEXT,\n    has_fulltext INTEGER DEFAULT 0, raw_path TEXT,\n    article_type TEXT, quality_type_prior TEXT,\n    abstract_excerpt TEXT, created_at TEXT\n)"
+    ],
+    [
+      "chunks",
+      "CREATE TABLE chunks (\n    chunk_id TEXT PRIMARY KEY,\n    pmid TEXT NOT NULL REFERENCES documents(pmid) ON DELETE CASCADE,\n    ordinal INTEGER, heading_path TEXT, section_importance REAL DEFAULT 1.0,\n    text TEXT, snippet TEXT, snippet_source TEXT,\n    char_start INTEGER, char_end INTEGER, created_at TEXT\n, level INTEGER DEFAULT 0, path TEXT, parent_id TEXT, child_ids TEXT, sibling_ids TEXT, heading_chain TEXT, doc_id TEXT)"
+    ],
+    [
+      "relevance",
+      "CREATE TABLE relevance (\n    chunk_id TEXT PRIMARY KEY REFERENCES chunks(chunk_id) ON DELETE CASCADE,\n    query TEXT, chunk_relevance REAL DEFAULT 0.0,\n    heading_match INTEGER DEFAULT 0, jaccard REAL DEFAULT 0.0, computed_at TEXT\n)"
+    ],
+    [
+      "quality_evidence",
+      "CREATE TABLE quality_evidence (\n    pmid TEXT PRIMARY KEY REFERENCES documents(pmid) ON DELETE CASCADE,\n    criterion_validity REAL, outcome_reliability REAL,\n    conclusion_data_consistency REAL, evidence_mean REAL, quality_final REAL,\n    computed_at TEXT, notes TEXT\n)"
+    ],
+    [
+      "venue",
+      "CREATE TABLE venue (\n    pmid TEXT PRIMARY KEY REFERENCES documents(pmid) ON DELETE CASCADE,\n    journal TEXT, year INTEGER, impact_factor REAL,\n    jcr_quartile TEXT, cas_zone TEXT, source TEXT\n)"
+    ],
+    [
+      "document_groups",
+      "CREATE TABLE document_groups (\n    pmid TEXT NOT NULL, project_slug TEXT NOT NULL,\n    role TEXT DEFAULT 'core', added_at TEXT, notes TEXT,\n    PRIMARY KEY (pmid, project_slug)\n)"
+    ],
+    [
+      "projects",
+      "CREATE TABLE projects (\n    slug TEXT PRIMARY KEY, title TEXT, status TEXT,\n    description TEXT, created_at TEXT, updated_at TEXT\n)"
+    ],
+    [
+      "project_queries",
+      "CREATE TABLE project_queries (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    project_slug TEXT NOT NULL, query TEXT,\n    pmid_count INTEGER, executed_at TEXT\n)"
+    ],
+    [
+      "sqlite_sequence",
+      "CREATE TABLE sqlite_sequence(name,seq)"
+    ],
+    [
+      "chunk_vectors",
+      "CREATE VIRTUAL TABLE chunk_vectors USING vec0(chunk_id TEXT PRIMARY KEY, embedding float[1024])"
+    ],
+    [
+      "chunk_vectors_info",
+      "CREATE TABLE \"chunk_vectors_info\" (key text primary key, value any)"
+    ],
+    [
+      "chunk_vectors_chunks",
+      "CREATE TABLE \"chunk_vectors_chunks\"(chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,size INTEGER NOT NULL,validity BLOB NOT NULL,rowids BLOB NOT NULL)"
+    ],
+    [
+      "chunk_vectors_rowids",
+      "CREATE TABLE \"chunk_vectors_rowids\"(rowid INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT UNIQUE NOT NULL,chunk_id INTEGER,chunk_offset INTEGER)"
+    ],
+    [
+      "chunk_vectors_vector_chunks00",
+      "CREATE TABLE \"chunk_vectors_vector_chunks00\"(rowid PRIMARY KEY,vectors BLOB NOT NULL)"
+    ]
+  ],
+  "counts": {
+    "documents": 418,
+    "chunks": 42548,
+    "projects": 4,
+    "document_groups": 418
+  }
+}
