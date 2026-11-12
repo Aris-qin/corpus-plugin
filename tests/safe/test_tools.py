@@ -23,7 +23,8 @@ def test_six_sdk_shaped_tools_and_strict_actions(root, monkeypatch):
     assert len(captured) == 6
     for name, (schema, handler) in captured.items():
         assert schema['name'] == name
-        assert schema['parameters']['oneOf']
+        assert schema['parameters']['properties']
+        assert 'oneOf' not in schema['parameters']
         assert json.loads(handler({'garbage': True}))['ok'] is False
         for action, specification in CONTRACTS[name].items():
             invalid = {specification['tag']: action, 'unexpected': True}

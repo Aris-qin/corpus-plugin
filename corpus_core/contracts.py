@@ -132,12 +132,56 @@ def validate_value(value, schema, path):
                 validate_value(item, schema['properties'][field], path + '.' + field)
 
 
+def schema_union(left, right):
+    if left == right:
+        return dict(left)
+    require(left.get('type') == right.get('type'), 'INVALID_SCHEMA', 'conflicting parameter types')
+    result = {}
+    lower_bounds = {'minimum', 'minLength', 'minItems', 'minProperties'}
+    upper_bounds = {'maximum', 'maxLength', 'maxItems', 'maxProperties'}
+    for key in left.keys() | right.keys():
+        if key not in left or key not in right:
+            if key in ('description', 'properties', 'items'):
+                result[key] = left.get(key, right.get(key))
+            continue
+        first, second = left[key], right[key]
+        if first == second:
+            result[key] = first
+        elif key in lower_bounds:
+            result[key] = min(first, second)
+        elif key in upper_bounds:
+            result[key] = max(first, second)
+        elif key == 'enum':
+            result[key] = list(dict.fromkeys([*first, *second]))
+        elif key == 'required':
+            result[key] = [field for field in first if field in second]
+        elif key == 'additionalProperties':
+            require(type(first) is bool and type(second) is bool, 'INVALID_SCHEMA', 'unsupported object conflict')
+            result[key] = first or second
+        elif key == 'properties':
+            result[key] = {**first, **second}
+            for field in first.keys() & second.keys():
+                result[key][field] = schema_union(first[field], second[field])
+        elif key == 'items':
+            result[key] = schema_union(first, second)
+        elif key == 'description':
+            result[key] = first + '; ' + second
+        else:
+            require(False, 'INVALID_SCHEMA', 'unsupported parameter conflict: ' + key)
+    return result
+
+
 def schema_for(name):
-    alternatives = []
-    for name_action, specification in CONTRACTS[name].items():
-        alternatives.append({'type': 'object', 'additionalProperties': False,
-                             'required': [specification['tag'], *specification['required']],
-                             'properties': {specification['tag']: {'enum': [name_action]}, **specification['required'], **specification['optional']}})
+    actions = CONTRACTS[name]
+    tag = next(iter(actions.values()))['tag']
+    properties = {tag: {'type': 'string', 'enum': list(actions)}}
+    action_descriptions = []
+    for name_action, specification in actions.items():
+        for field, schema in {**specification['required'], **specification['optional']}.items():
+            properties[field] = schema_union(properties[field], schema) if field in properties else dict(schema)
+        required = ', '.join(specification['required']) or '(none)'
+        optional = ', '.join(specification['optional']) or '(none)'
+        action_descriptions.append(f'{tag}={name_action}: required: {required}; optional: {optional}')
     description = name.replace('_', ' ') + '; candidate-only, strict per-action contracts'
     if name == 'corpus_manage':
         description += '; sensitive apply disabled by default: no trusted human approval adapter; isolated simulations are not identity proof'
@@ -145,8 +189,9 @@ def schema_for(name):
         description += '; partial means lexical/read available but vector index incomplete; retry uses explicit settings budget for original operation/profile; ambiguous billed results require local operator reconcile-embedding, never blind retry'
     if name == 'corpus_reference':
         description += '; drafts and proposals available; formal publication and batch apply disabled without trusted human approval integration'
-    return {'name': name, 'description': description,
-            'parameters': {'type': 'object', 'oneOf': alternatives}}
+    return {'name': name, 'description': description + '\n' + '\n'.join(action_descriptions),
+            'parameters': {'type': 'object', 'additionalProperties': False,
+                           'required': [tag], 'properties': properties}}
 
 
 def validate(name, arguments):

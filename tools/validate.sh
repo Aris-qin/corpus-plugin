@@ -58,14 +58,14 @@ run source-compile "$PYTHON" -m compileall -q -f corpus_core tests/safe tools bu
 crash_stress source
 run package "$PYTHON" -m build_backend --out "$EVIDENCE/dist"
 run installed-venv "$PYTHON" -m venv --without-pip "$RUN/installed-venv"
-run installed-wheel "$RUN/installed-venv/bin/python" -I -B "$SOURCE/tools/offline_install_wheel.py" "$EVIDENCE/dist/corpus_candidate-2.0.0-py3-none-any.whl"
+run installed-wheel "$RUN/installed-venv/bin/python" -I -B "$SOURCE/tools/offline_install_wheel.py" "$EVIDENCE/dist/corpus_candidate-2.2.0-py3-none-any.whl"
 cd "$RUN"
 run installed-import "$RUN/installed-venv/bin/python" -I -B -c 'import pathlib,sys,corpus_core; path=pathlib.Path(corpus_core.__file__).resolve(); print(path); assert path.is_relative_to(pathlib.Path(sys.prefix))'
 run installed-cli "$RUN/installed-venv/bin/corpus" --root "$RUN/installed-probe" probe
 run installed-directory-import "$RUN/installed-venv/bin/python" -I -B -c 'import importlib.util,pathlib,sys; path=pathlib.Path(sys.prefix)/"hermes-plugins/corpus-candidate/__init__.py"; spec=importlib.util.spec_from_file_location("installed_corpus",path); module=importlib.util.module_from_spec(spec); sys.modules[spec.name]=module; spec.loader.exec_module(module); assert len(sys.modules["installed_corpus.corpus_core.contracts"].CONTRACTS)==6; assert "corpus_core" not in sys.modules; print(module.register.__module__); print("entrypoint import only; real Hermes discovery remains parent gate")'
 cd "$SOURCE"
-run unpack-source "$PYTHON" -m tarfile -e "$EVIDENCE/dist/corpus_candidate-2.0.0.tar.gz" "$RUN/source"
-cd "$RUN/source/corpus_candidate-2.0.0"
+run unpack-source "$PYTHON" -m tarfile -e "$EVIDENCE/dist/corpus_candidate-2.2.0.tar.gz" "$RUN/source"
+cd "$RUN/source/corpus_candidate-2.2.0"
 run sdist-import "$PYTHON" -c 'from pathlib import Path; import corpus_core; path=Path(corpus_core.__file__).resolve(); print(path); assert path.is_relative_to(Path.cwd())'
 run sdist-collection "$PYTHON" -m pytest tests/safe --collect-only --sandbox-root "$RUN" --basetemp "$RUN/sdist-collection" -o cache_dir="$RUN/sdist-cache" -q
 run sdist-full "$PYTHON" -m pytest tests/safe --sandbox-root "$RUN" --basetemp "$RUN/sdist-tests" -o cache_dir="$RUN/sdist-cache" --junitxml="$EVIDENCE/sdist.xml" -q
@@ -73,8 +73,9 @@ find "$RUN/sdist-tests" -name recall-working-set.json -exec cp '{}' "$EVIDENCE/s
 run sdist-compile "$PYTHON" -m compileall -q -f corpus_core tests/safe tools build_backend.py __init__.py
 crash_stress sdist
 cd "$SOURCE"
-run unpack-wheel "$PYTHON" -m zipfile -e "$EVIDENCE/dist/corpus_candidate-2.0.0-py3-none-any.whl" "$RUN/wheel"
+run unpack-wheel "$PYTHON" -m zipfile -e "$EVIDENCE/dist/corpus_candidate-2.2.0-py3-none-any.whl" "$RUN/wheel"
 cp -R tests "$RUN/wheel/"
+cp -R tools "$RUN/wheel/"
 cp pyproject.toml build_backend.py plugin.yaml __init__.py LEGACY_SCHEMA.json "$RUN/wheel/"
 cd "$RUN/wheel"
 run wheel-import "$PYTHON" -c 'from pathlib import Path; import corpus_core; path=Path(corpus_core.__file__).resolve(); print(path); assert path.is_relative_to(Path.cwd())'

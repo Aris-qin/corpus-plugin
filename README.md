@@ -1,4 +1,4 @@
-# corpus-plugin v2.0.0
+# corpus-plugin v2.2.0
 
 Corpus 是全局共享的研究资料与检索库，保存原始文献和原文位置，管理期刊画像、作者指引、专题调研及项目参考档案。项目与主题组织引用，不分割原始资料库。
 
@@ -44,7 +44,7 @@ bash install.sh --target /ABSOLUTE/hermes-home/plugins/corpus-query --mode adapt
 
 adapter 需明确 authorized_root、settings_file、runtime_python、runtime_root 四个绝对路径。direct 使用 CORPUS_AUTHORIZED_SANDBOX_ROOT 及 CORPUS_SETTINGS_FILE。数据与非密钥设置必须位于授权根内，密钥仅由环境变量注入。
 
-分发包暂保留兼容名 corpus-candidate，版本统一为 2.0.0；Python 模块 corpus_core，运行插件名 corpus-query。wheel 内 corpus-candidate 数据目录是兼容路径，不是旧版本。
+分发包暂保留兼容名 corpus-candidate，版本统一为 2.2.0；Python 模块 corpus_core，运行插件名 corpus-query。wheel 内 corpus-candidate 数据目录是兼容路径，不是旧版本。
 
 从源码根目录执行 CLI，或先安装 wheel：
 

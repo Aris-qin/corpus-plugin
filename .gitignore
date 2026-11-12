@@ -66,3 +66,7 @@ Thumbs.db
 *.tmp
 .cache/
 .worktrees/
+
+# --- 验收证据与临时工作区（不进入仓库）---
+evidence/
+tmp/

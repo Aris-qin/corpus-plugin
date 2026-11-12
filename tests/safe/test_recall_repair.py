@@ -38,6 +38,7 @@ def test_full_library_lexical_recall_with_low_budget(library, query):
     assert len(result['hits']) == 2
     assert all('abletooperate' in hit['text'] for hit in result['hits'])
     assert result['candidate_count'] <= 2 and result['truncated']
+    assert result['retrieval_diagnostics']['list_cut_upper_bound'] == 2 / 62
     assert result['retrieval_diagnostics']['eligible_chunks_scanned'] == 10025
     assert result['retrieval_diagnostics']['lexical_matches'] == 4
 

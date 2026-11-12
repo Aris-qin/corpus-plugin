@@ -1,5 +1,8 @@
 import heapq
 import json
+import math
+import os
+import time
 import re
 
 from .db import encoded, transaction
@@ -38,6 +41,8 @@ class Retrieval:
         require(scope != 'linked' or context is not None, 'CONTEXT_REQUIRED', 'linked scope requires explicit context')
         require(type(candidate_budget) is int and 1 <= candidate_budget <= 10000, 'INVALID_BUDGET', 'candidate budget 1..10000')
         require(type(top_k) is int and 1 <= top_k <= 100, 'INVALID_LIMIT', 'limit must be integer 1..100')
+        timing_enabled = os.environ.get('CORPUS_VECTOR_TIMINGS') == '1'
+        clock = time.perf_counter if timing_enabled else lambda: 0.0
         parameters = []
         condition = ''
         if scope == 'linked':
@@ -69,7 +74,10 @@ class Retrieval:
             expression = ' OR '.join('"' + token.replace('"', '""') + '"' for token in tokens)
             fts = iter(self.db.execute('SELECT chunk_id,-bm25(chunk_fts) score FROM chunk_fts WHERE chunk_fts MATCH ? ORDER BY chunk_id', (expression,)))
         diagnostics = {'coverage': 'full_eligible_corpus', 'eligible_chunks_scanned': 0,
-                       'lexical_matches': 0, 'vectors_scanned': 0, 'ranking_heap_limit': candidate_budget}
+                       'lexical_matches': 0, 'vectors_scanned': 0, 'ranking_heap_limit': candidate_budget,
+                       'scan_scope': 'full_eligible_corpus',
+                       'ranking_metadata_scope': 'retained_candidates',
+                       'fusion_policy': 'retained_rank_v1'}
 
         def lexical_candidates():
             match = next(fts, None)
@@ -86,7 +94,24 @@ class Retrieval:
 
         ranking_key = lambda pair: (-pair[1], pair[0])
         selection_key = lambda pair: (pair[2], pair[3], -pair[1], pair[0])
-        lexical = sorted([(pair[0], pair[1]) for pair in heapq.nsmallest(candidate_budget, lexical_candidates(), key=selection_key)], key=ranking_key)
+
+        def select_candidates(candidates):
+            count = 0
+
+            def counted_candidates():
+                nonlocal count
+                for candidate in candidates:
+                    count += 1
+                    yield candidate
+
+            retained = heapq.nsmallest(candidate_budget, counted_candidates(), key=selection_key)
+            return sorted([(pair[0], pair[1]) for pair in retained], key=ranking_key), count > candidate_budget
+
+        lexical_started = clock()
+        lexical, diagnostics['lexical_list_cut'] = select_candidates(lexical_candidates())
+        if timing_enabled:
+            diagnostics['lexical_scan_seconds'] = clock() - lexical_started
+        diagnostics['vector_list_cut'] = False
         if hasattr(fts, 'close'):
             fts.close()
         vector_scores = []
@@ -102,15 +127,45 @@ class Retrieval:
             profile.vector(query_vector)
             known = self.db.execute('SELECT config FROM embedding_profiles WHERE id=?', (profile.id,)).fetchone()
             if known:
-                embeddings = self.db.execute('SELECT e.chunk_id,e.vector,eligible.version_kind,eligible.preferred FROM chunk_embeddings e JOIN (' + eligible + ') eligible ON eligible.id=e.chunk_id WHERE e.profile_id=?', (*parameters, profile.id))
+                from .vector_cache import CACHE
+                timings = {'eligible_sql_seconds': 0.0, 'artifact_load_seconds': 0.0, 'kernel_seconds': 0.0}
+                if timing_enabled:
+                    diagnostics['vector_scan_timings'] = timings
 
-                def vector_candidates():
-                    for row in embeddings:
-                        diagnostics['vectors_scanned'] += 1
-                        yield row['chunk_id'], cosine(query_vector, json.loads(row['vector'])), row['version_kind'] != 'formal', not row['preferred']
+                def vector_candidates(matrix=None):
+                    started = clock()
+                    projection = 'e.vector,' if matrix is None else ''
+                    embeddings = iter(self.db.execute('SELECT e.chunk_id,' + projection + 'eligible.version_kind,eligible.preferred FROM chunk_embeddings e JOIN (' + eligible + ') eligible ON eligible.id=e.chunk_id WHERE e.profile_id=?', (*parameters, profile.id)))
+                    timings['eligible_sql_seconds'] += clock() - started
+                    query_norm = math.hypot(*query_vector)
+                    try:
+                        while True:
+                            started = clock()
+                            row = next(embeddings, None)
+                            timings['eligible_sql_seconds'] += clock() - started
+                            if row is None:
+                                break
+                            diagnostics['vectors_scanned'] += 1
+                            started = clock()
+                            score = (matrix.score(query_vector, query_norm, row['chunk_id']) if matrix is not None
+                                     else cosine(query_vector, json.loads(row['vector'])))
+                            timings['kernel_seconds'] += clock() - started
+                            yield row['chunk_id'], score, row['version_kind'] != 'formal', not row['preferred']
+                    finally:
+                        embeddings.close()
 
-                vector_scores = sorted([(pair[0], pair[1]) for pair in heapq.nsmallest(candidate_budget, vector_candidates(), key=selection_key)], key=ranking_key)
-                warnings = ['exact_vector_scan_full_eligible_linear_cost_bounded_memory']
+                started = clock()
+                with CACHE.open(self, profile.id) as (matrix, cache_warning):
+                    timings['artifact_load_seconds'] = clock() - started
+                    try:
+                        vector_scores, diagnostics['vector_list_cut'] = select_candidates(vector_candidates(matrix))
+                    except Exception:
+                        if matrix is None:
+                            raise
+                        diagnostics['vectors_scanned'] = 0
+                        vector_scores, diagnostics['vector_list_cut'] = select_candidates(vector_candidates())
+                        cache_warning = 'vector_cache_corrupt'
+                warnings = ['exact_vector_scan_full_eligible_linear_cost_bounded_rank_metadata', cache_warning]
             else:
                 warnings = ['search_degraded_profile_not_indexed']
         if configured_status is not None and configured_status != 'complete':
@@ -119,15 +174,21 @@ class Retrieval:
             warnings.append('index_incomplete')
         if self.db.execute("SELECT 1 FROM legacy_vectors WHERE profile='legacy_unknown' LIMIT 1").fetchone():
             warnings.append('legacy_vectors_quarantined_unverified_provenance')
+        fusion_started = clock()
         combined = {}
         for ranking in (lexical, vector_scores):
             for rank, (chunk_id, score) in enumerate(ranking, 1):
                 combined[chunk_id] = combined.get(chunk_id, 0) + 1 / (60 + rank)
         by_id = {row['id']: row for row in self.db.execute(eligible + ' AND c.id IN (SELECT value FROM json_each(?))', (*parameters, encoded(sorted(combined))))}
         ordered = sorted(combined, key=lambda key: (by_id[key]['version_kind'] != 'formal', not by_id[key]['preferred'], -combined[key], key))
-        truncated = (diagnostics['lexical_matches'] > candidate_budget or
-                     diagnostics['vectors_scanned'] > candidate_budget or len(ordered) > candidate_budget)
         diagnostics['candidate_union_count'] = len(ordered)
+        diagnostics['union_cut'] = len(ordered) > candidate_budget
+        list_cut = diagnostics['lexical_list_cut'] or diagnostics['vector_list_cut']
+        list_cut_bound = 2 / (60 + candidate_budget) if list_cut else None
+        best_union_discarded = max((combined[chunk_id] for chunk_id in ordered[candidate_budget:]), default=None)
+        best_discarded = max((bound for bound in (list_cut_bound, best_union_discarded) if bound is not None), default=None)
+        diagnostics['list_cut_upper_bound'] = list_cut_bound
+        diagnostics['best_discarded_upper_bound'] = best_discarded
         ordered = ordered[:candidate_budget]
         hits = []
         per_version = {}
@@ -144,8 +205,11 @@ class Retrieval:
                          **self.source_evidence(row['version_id'], 'corpus://chunk/' + chunk_id),
                          'locator': json.loads(row['locator']), 'rrf_score': combined[chunk_id],
                          'lexical_score': lexical_scores.get(chunk_id), 'vector_score': vector_by_id.get(chunk_id)})
+        if timing_enabled:
+            diagnostics['fusion_seconds'] = clock() - fusion_started
         binding = {'query': query, 'scope': scope, 'context': context, 'top_k': top_k,
-                   'profile': profile.id if profile else None, 'query_vector': query_vector, 'budget': candidate_budget, 'filters': filters}
+                   'profile': profile.id if profile else None, 'query_vector': query_vector, 'budget': candidate_budget, 'filters': filters,
+                   'fusion_policy': 'retained_rank_v1', 'best_discarded_upper_bound': best_discarded}
         if self.rerank is not None:
             binding['rerank'] = self.rerank.id
             if cursor is not None:
@@ -153,6 +217,10 @@ class Retrieval:
             hits, rerank_warnings = self.rerank.rank(query, hits, binding)
             warnings.extend(rerank_warnings)
         selected, next_cursor = page(self.root, hits, binding, top_k, cursor)
+        page_floor = min((hit['rrf_score'] for hit in selected), default=None)
+        truncated = best_discarded is not None and page_floor is not None and best_discarded >= page_floor
+        diagnostics['page_floor_fused_score'] = page_floor
+        diagnostics['result_complete_for_page'] = not truncated
         incomplete = self.db.execute("SELECT count(*) FROM jobs WHERE state!='succeeded'").fetchone()[0]
         return {'hits': selected, 'cursor': next_cursor, 'scope': scope, 'truncated': truncated,
                 'related_reports': self.related_reports(sorted({hit['version_id'] for hit in selected})),

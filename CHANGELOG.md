@@ -4,6 +4,27 @@ All notable changes to corpus-plugin are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [2.2.0] - 2026-11-12
+
+### Added
+- `corpus_core/vector_cache.py`：离线构建 float32 二进制向量产物（mmap 零拷贝、单点可替换 dot kernel、有界 LRU），JSON 路径保留为降级回退，不引入 numpy 依赖。
+- `corpus_core/backfill.py` 与 CLI `vectors-build` / `vectors-verify` / `reconcile-embedding`：显式预算的向量回填、对账与产物校验。
+- 六工具参数 schema 扁平化（`contracts.schema_union`），工具目录可直接看到每个 action 的 properties 与必填项，不再只显示空参数。
+
+### Changed
+- 截断判定改为只回答“是否可能丢掉进入本页的候选”，被丢弃候选以融合分上界 `2/(60+budget)` 比较，不再拿扫描量与保留上限对比。
+- RRF 名次只在裁剪后的保留榜内计算，恢复 v2.0.0 的排序语义，避免深尾名次打破精确平局并随库增长漂移。
+
+### Fixed
+- 库内向量超过保留上限后每次查询都误报 `candidate_budget_exhausted`（`status` 实为完整仍标 truncated）。
+- embedding 429 单独归类为可重试的 `PROVIDER_RATE_LIMITED`，不再并入 5xx 分支。
+
+### Safety and upgrade limitations
+- 正式报告发布、批量正式采用、合并、永久删除仍默认禁用，可信真人审批未接通。
+- `legacy_vectors` 保持隔离、未认领；旧原件托管与部分历史关系仍需显式接管。
+- 二进制向量产物属派生物，重新嵌入导致指纹变化即失效并自动回退 JSON。
+- 运行时按调用新建子进程，进程内缓存不跨调用复用。
+
 ## [2.0.0] - 2026-11-11
 
 ### Added

@@ -35,6 +35,22 @@ def main(argv=None):
     migration.add_argument('--source', required=True)
     subparsers.add_parser('legacy-inventory')
     subparsers.add_parser('embedding-recovery-inventory')
+    backfill = subparsers.add_parser('embed-backfill', help='operator-only reembedding; default dry-run, budgets per invocation')
+    backfill.add_argument('--apply', action='store_true')
+    backfill.add_argument('--limit', type=int, default=0)
+    backfill.add_argument('--batch-size', type=int, default=10)
+    backfill.add_argument('--max-chars', type=int, help='total character budget and maximum characters per batch')
+    backfill.add_argument('--max-calls', type=int)
+    backfill.add_argument('--sleep', type=float, default=0)
+    backfill.add_argument('--rate-limit-retries', type=int, default=3, help='additional 429 retries, from 0 to 3')
+    backfill.add_argument('--rate-limit-delays', type=float, nargs=3, default=(2, 8, 20),
+                          help='three 429 backoff intervals, each from 0 to 60 seconds')
+    backfill.add_argument('--report')
+    vectors_build = subparsers.add_parser('vectors-build', help='derived local vector cache; default dry-run')
+    vectors_build.add_argument('--profile-id', required=True)
+    vectors_build.add_argument('--apply', action='store_true')
+    vectors_verify = subparsers.add_parser('vectors-verify', help='verify vector index and database content')
+    vectors_verify.add_argument('--profile-id', required=True)
     for command in ('adopt-original', 'claim-legacy-profile', 'reconcile-embedding'):
         maintenance = subparsers.add_parser(command, help='local operator evidence path; not a model tool or identity proof')
         maintenance.add_argument('--manifest', required=True)
@@ -67,6 +83,24 @@ def main(argv=None):
             corpus = corpus or Corpus(root, sandbox_root=boundary)
             if args.command == 'operator-approve':
                 result = corpus.operator_approve(args.proposal_id, args.hash, args.binding)
+            elif args.command == 'embed-backfill':
+                from .backfill import backfill
+                from .paths import bounded
+                report_path = bounded(args.report, boundary) if args.report else None
+                if report_path:
+                    from .errors import require
+                    require(report_path != corpus.root / 'catalogue.sqlite' and not report_path.exists(),
+                            'INVALID_REPORT', 'report must be a new file, never an existing database/settings file')
+                result = backfill(corpus, apply=args.apply, limit=args.limit, batch_size=args.batch_size,
+                                  max_chars=args.max_chars, max_calls=args.max_calls, sleep=args.sleep,
+                                  rate_limit_retries=args.rate_limit_retries, rate_limit_delays=args.rate_limit_delays)
+                if report_path:
+                    with report_path.open('x') as report_file:
+                        report_file.write(json.dumps(result, ensure_ascii=False, allow_nan=False) + '\n')
+            elif args.command in ('vectors-build', 'vectors-verify'):
+                from .vector_cache import build, verify
+                result = (build(corpus, args.profile_id, apply=args.apply) if args.command == 'vectors-build'
+                          else verify(corpus, args.profile_id))
             elif args.command == 'migrate-readonly':
                 result = migrate(corpus, args.source)
             elif args.command == 'legacy-inventory':

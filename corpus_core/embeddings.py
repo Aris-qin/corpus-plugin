@@ -87,7 +87,9 @@ class JSONAPITransport:
         options = {} if self.timeout is None else {'timeout': self.timeout}
         status, response_headers, response = request(url, host, address, self.max_response_bytes,
                                                      method='POST', body=body, headers=headers, **options)
-        if status in (429, 500, 502, 503, 504):
+        if status == 429:
+            raise CorpusError('PROVIDER_RATE_LIMITED', 'provider rejected request due to rate limit', retryable=True)
+        if status in (500, 502, 503, 504):
             raise CorpusError('PROVIDER_RETRYABLE', 'provider temporarily unavailable', retryable=True)
         require(status == 200, 'PROVIDER_FAILED', 'embedding API request failed; redirects not followed')
         return json.loads(response)

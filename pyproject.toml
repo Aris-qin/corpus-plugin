@@ -5,7 +5,7 @@ backend-path = ["."]
 
 [project]
 name = "corpus-candidate"
-version = "2.0.0"
+version = "2.2.0"
 requires-python = ">=3.11"
 description = "Global research source library for Hermes; restricted sensitive actions"
 
